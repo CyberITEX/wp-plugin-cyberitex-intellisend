@@ -1,0 +1,671 @@
+/**
+ * IntelliSend Form Admin Styles
+ *
+ * Styles for the admin settings and report pages.
+ */
+
+/* General Styles */
+.intellisend-settings-wrap {
+    max-width: 1200px;
+    margin: 20px auto;
+}
+
+.intellisend-settings-intro {
+    margin-bottom: 20px;
+}
+
+.intellisend-settings-container {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+/* Tabs */
+.intellisend-settings-tabs {
+    display: flex;
+    border-bottom: 1px solid #ccd0d4;
+    background: #f8f9fa;
+}
+
+.tab-button {
+    background: transparent;
+    border: none;
+    padding: 15px 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #555;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid #eee;
+    transition: all 0.2s ease;
+}
+
+.tab-button .dashicons {
+    margin-right: 8px;
+}
+
+.tab-button:hover {
+    background: #f0f0f1;
+    color: #23282d;
+}
+
+.tab-button.active {
+    background: #fff;
+    color: #2271b1;
+    border-bottom: 2px solid #2271b1;
+    margin-bottom: -1px;
+}
+
+.intellisend-settings-content {
+    padding: 20px;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.intellisend-settings-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #ccd0d4;
+    background: #f8f9fa;
+    text-align: right;
+}
+
+/* Toast Notifications */
+.intellisend-toast-container {
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 400px;
+}
+
+.intellisend-toast {
+    background-color: #fff;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    margin-bottom: 10px;
+    padding: 15px;
+    display: flex;
+    align-items: flex-start;
+    transform: translateX(120%);
+    transition: transform 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.intellisend-toast-visible {
+    transform: translateX(0);
+}
+
+.intellisend-toast-success {
+    border-left: 4px solid #46b450;
+}
+
+.intellisend-toast-error {
+    border-left: 4px solid #dc3232;
+}
+
+.intellisend-toast-warning {
+    border-left: 4px solid #ffb900;
+}
+
+.intellisend-toast-info {
+    border-left: 4px solid #00a0d2;
+}
+
+.intellisend-toast-icon {
+    margin-right: 10px;
+    width: 20px;
+    height: 20px;
+    position: relative;
+}
+
+.intellisend-toast-success .intellisend-toast-icon:before {
+    content: "\f147";
+    font-family: dashicons;
+    color: #46b450;
+    font-size: 20px;
+}
+
+.intellisend-toast-error .intellisend-toast-icon:before {
+    content: "\f335";
+    font-family: dashicons;
+    color: #dc3232;
+    font-size: 20px;
+}
+
+.intellisend-toast-warning .intellisend-toast-icon:before {
+    content: "\f534";
+    font-family: dashicons;
+    color: #ffb900;
+    font-size: 20px;
+}
+
+.intellisend-toast-info .intellisend-toast-icon:before {
+    content: "\f348";
+    font-family: dashicons;
+    color: #00a0d2;
+    font-size: 20px;
+}
+
+.intellisend-toast-content {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.intellisend-toast-close {
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    color: #aaa;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.intellisend-toast-close:hover {
+    color: #666;
+}
+
+/* Debug Information */
+.debug-info-toggle {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 5px 10px;
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #555;
+}
+
+.debug-info-toggle:hover {
+    background-color: #e0e0e0;
+}
+
+.debug-info-content {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.debug-info-content pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Status Messages */
+.success-message {
+    color: #46b450;
+    font-weight: 500;
+    margin-left: 10px;
+}
+
+.error-message {
+    color: #dc3232;
+    font-weight: 500;
+    margin-left: 10px;
+}
+
+/* Report Page Styles */
+.intellisend-report-wrap {
+    max-width: 1200px;
+    margin: 20px auto;
+}
+
+.intellisend-stats-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #f9f9f9 30%, #ffffff 100%);
+    padding: 10px 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    position: relative;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    padding: 8px 12px;
+    margin-right: 10px;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.stat-item .dashicons {
+    font-size: 20px;
+    margin-right: 6px;
+}
+
+.stat-text {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.intellisend-clear-logs {
+    margin-left: auto;
+}
+
+.intellisend-per-page-wrap select {
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+/* Report Table */
+.intellisend-report-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.intellisend-report-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    text-align: left;
+    padding: 10px;
+}
+
+.intellisend-report-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.intellisend-report-table th.sortable:hover {
+    background-color: #e2e2e2;
+}
+
+.intellisend-report-table td {
+    padding: 10px;
+    vertical-align: middle;
+}
+
+.intellisend-report-table .log-row:hover {
+    cursor: pointer;
+    background-color: #f6f6f6;
+}
+
+.intellisend-report-table .details-row {
+    background-color: #fff;
+}
+
+.intellisend-report-table .details-content {
+    margin: 10px 0;
+    background: #fbfbfb;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.intellisend-report-table .details-content pre {
+    margin-top: 5px;
+    background: #ffffff;
+    padding: 6px;
+    border: 1px solid #ddd;
+    max-height: 200px;
+    overflow: auto;
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-sent {
+    background-color: #edfaef;
+    color: #46b450;
+}
+
+.status-blocked {
+    background-color: #f1f1f1;
+    color: #555;
+}
+
+.status-failed {
+    background-color: #fbeaea;
+    color: #dc3232;
+}
+
+/* Form Elements */
+.intellisend-settings-wrap input[type="text"],
+.intellisend-settings-wrap input[type="password"],
+.intellisend-settings-wrap input[type="email"],
+.intellisend-settings-wrap input[type="number"],
+.intellisend-settings-wrap select,
+.intellisend-settings-wrap textarea {
+    border: 1px solid #ddd;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.07);
+    padding: 6px 8px;
+    border-radius: 4px;
+}
+
+.intellisend-settings-wrap input[type="text"]:focus,
+.intellisend-settings-wrap input[type="password"]:focus,
+.intellisend-settings-wrap input[type="email"]:focus,
+.intellisend-settings-wrap input[type="number"]:focus,
+.intellisend-settings-wrap select:focus,
+.intellisend-settings-wrap textarea:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: 2px solid transparent;
+}
+
+.intellisend-settings-wrap label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.intellisend-settings-wrap .form-field {
+    margin-bottom: 15px;
+}
+
+.intellisend-settings-wrap .form-field-inline {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.intellisend-settings-wrap .form-field-inline label {
+    margin-right: 10px;
+    margin-bottom: 0;
+    min-width: 150px;
+}
+
+.intellisend-settings-wrap .form-field-inline input,
+.intellisend-settings-wrap .form-field-inline select {
+    flex: 1;
+}
+
+.intellisend-settings-wrap .form-field-description {
+    color: #666;
+    font-size: 13px;
+    margin-top: 4px;
+}
+
+/* Test Email Section */
+.test-email-section {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.test-email-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.test-email-section .form-field {
+    margin-bottom: 10px;
+}
+
+.test-email-debug {
+    margin-top: 15px;
+    display: none;
+}
+
+/* Admin Container Layout */
+.intellisend-admin-container {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+
+.intellisend-admin-main {
+    flex: 1;
+    min-width: 600px;
+    margin-right: 20px;
+}
+
+.intellisend-admin-sidebar {
+    width: 300px;
+}
+
+/* Card Styling */
+.intellisend-card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    margin-bottom: 20px;
+    padding: 20px;
+}
+
+.intellisend-card h2:first-child,
+.intellisend-card h3:first-child {
+    margin-top: 0;
+}
+
+/* Status Indicators */
+.intellisend-status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.status-success {
+    background-color: #dff0d8;
+    color: #3c763d;
+}
+
+.status-error {
+    background-color: #f2dede;
+    color: #a94442;
+}
+
+.status-warning {
+    background-color: #fcf8e3;
+    color: #8a6d3b;
+}
+
+/* Statistics Styling */
+.intellisend-stats {
+    margin-top: 15px;
+}
+
+.intellisend-stat-item {
+    margin-bottom: 15px;
+}
+
+.intellisend-stat-label {
+    display: inline-block;
+    width: 80px;
+    font-weight: bold;
+}
+
+.intellisend-stat-value {
+    font-weight: bold;
+    float: right;
+}
+
+.intellisend-stat-bar {
+    height: 10px;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    margin: 5px 0;
+    overflow: hidden;
+}
+
+.intellisend-stat-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+}
+
+.intellisend-stat-percent {
+    font-size: 12px;
+    color: #666;
+}
+
+/* Form Styling */
+.intellisend-form-section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.intellisend-form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+/* Modal Styling */
+.intellisend-modal {
+    display: none;
+    position: fixed;
+    z-index: 100000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.intellisend-modal-content {
+    position: relative;
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 70%;
+    max-width: 800px;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+}
+
+.intellisend-modal-close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.intellisend-modal-close:hover {
+    color: black;
+}
+
+/* Email Details */
+.intellisend-email-details {
+    margin-top: 20px;
+}
+
+.intellisend-email-details dl {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px;
+}
+
+.intellisend-email-details dt {
+    font-weight: bold;
+    text-align: right;
+}
+
+.intellisend-email-details dd {
+    margin: 0;
+}
+
+.intellisend-email-body {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #eee;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Responsive Adjustments */
+@media screen and (max-width: 960px) {
+    .intellisend-admin-container {
+        flex-direction: column;
+    }
+    
+    .intellisend-admin-main {
+        margin-right: 0;
+        min-width: auto;
+    }
+    
+    .intellisend-admin-sidebar {
+        width: 100%;
+    }
+    
+    .intellisend-email-details dl {
+        grid-template-columns: 1fr;
+    }
+    
+    .intellisend-email-details dt {
+        text-align: left;
+    }
+}
+
+@media screen and (max-width: 782px) {
+    .intellisend-settings-tabs {
+        flex-direction: column;
+    }
+    
+    .tab-button {
+        border-right: none;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .intellisend-stats-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .stat-item {
+        margin-bottom: 10px;
+        width: 100%;
+    }
+    
+    .intellisend-clear-logs {
+        margin-left: 0;
+        margin-top: 10px;
+        width: 100%;
+    }
+    
+    .intellisend-clear-logs button {
+        width: 100%;
+    }
+    
+    .intellisend-form-field-inline {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .intellisend-form-field-inline label {
+        margin-bottom: 5px;
+        min-width: auto;
+    }
+    
+    .intellisend-toast-container {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+    }
+}
