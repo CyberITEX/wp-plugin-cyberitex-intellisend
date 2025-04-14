@@ -24,12 +24,20 @@ function intellisend_render_reports_page_content() {
     // Pagination
     $page = isset( $_GET['paged'] ) ? intval( $_GET['paged'] ) : 1;
     $per_page = 20;
-    $offset = ( $page - 1 ) * $per_page;
 
     // Filters
     $filters = array();
-    $filters['limit'] = $per_page;
-    $filters['offset'] = $offset;
+    $filters['per_page'] = $per_page;
+    $filters['page'] = $page;
+
+    // Sorting parameters
+    if ( isset( $_GET['orderby'] ) && ! empty( $_GET['orderby'] ) ) {
+        $filters['orderby'] = sanitize_text_field( $_GET['orderby'] );
+    }
+    
+    if ( isset( $_GET['order'] ) && ! empty( $_GET['order'] ) ) {
+        $filters['order'] = sanitize_text_field( $_GET['order'] );
+    }
 
     // Status filter
     if ( isset( $_GET['status'] ) && ! empty( $_GET['status'] ) ) {
@@ -146,21 +154,90 @@ function intellisend_render_reports_page_content() {
                 
                 <div class="intellisend-table-container">
                     <?php if ( ! empty( $reports ) ) : ?>
+                        <div class="table-actions">
+                            <div class="bulk-actions">
+                                <select id="bulk-action-selector">
+                                    <option value=""><?php echo esc_html__( 'Bulk Actions', 'intellisend' ); ?></option>
+                                    <option value="delete"><?php echo esc_html__( 'Delete Selected', 'intellisend' ); ?></option>
+                                </select>
+                                <button type="button" id="bulk-action-apply" class="button action"><?php echo esc_html__( 'Apply', 'intellisend' ); ?></button>
+                            </div>
+                            <div class="selection-info">
+                                <span id="selected-count">0</span> <?php echo esc_html__( 'items selected', 'intellisend' ); ?>
+                            </div>
+                            <div class="table-actions-right">
+                                <button type="button" id="delete-all-reports" class="button action"><?php echo esc_html__( 'Delete All', 'intellisend' ); ?></button>
+                            </div>
+                        </div>
                         <table class="intellisend-table">
                             <thead>
                                 <tr>
-                                    <th><?php echo esc_html__( 'Date', 'intellisend' ); ?></th>
-                                    <th><?php echo esc_html__( 'Status', 'intellisend' ); ?></th>
-                                    <th><?php echo esc_html__( 'Subject', 'intellisend' ); ?></th>
-                                    <th><?php echo esc_html__( 'From', 'intellisend' ); ?></th>
-                                    <th><?php echo esc_html__( 'To', 'intellisend' ); ?></th>
-                                    <th><?php echo esc_html__( 'Provider', 'intellisend' ); ?></th>
+                                    <th class="checkbox-column">
+                                        <input type="checkbox" id="select-all-reports">
+                                    </th>
+                                    <th class="sortable" data-sort="date">
+                                        <?php 
+                                        echo esc_html__( 'Date', 'intellisend' );
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'date' ? $_GET['order'] : '';
+                                        if ($current_order) {
+                                            echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
+                                        }
+                                        ?>
+                                    </th>
+                                    <th class="sortable" data-sort="status">
+                                        <?php 
+                                        echo esc_html__( 'Status', 'intellisend' );
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'status' ? $_GET['order'] : '';
+                                        if ($current_order) {
+                                            echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
+                                        }
+                                        ?>
+                                    </th>
+                                    <th class="sortable" data-sort="subject">
+                                        <?php 
+                                        echo esc_html__( 'Subject', 'intellisend' );
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'subject' ? $_GET['order'] : '';
+                                        if ($current_order) {
+                                            echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
+                                        }
+                                        ?>
+                                    </th>
+                                    <th class="sortable" data-sort="sender">
+                                        <?php 
+                                        echo esc_html__( 'From', 'intellisend' );
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'sender' ? $_GET['order'] : '';
+                                        if ($current_order) {
+                                            echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
+                                        }
+                                        ?>
+                                    </th>
+                                    <th class="sortable" data-sort="recipients">
+                                        <?php 
+                                        echo esc_html__( 'To', 'intellisend' );
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'recipients' ? $_GET['order'] : '';
+                                        if ($current_order) {
+                                            echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
+                                        }
+                                        ?>
+                                    </th>
+                                    <th class="sortable" data-sort="providerName">
+                                        <?php 
+                                        echo esc_html__( 'Provider', 'intellisend' );
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'providerName' ? $_GET['order'] : '';
+                                        if ($current_order) {
+                                            echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
+                                        }
+                                        ?>
+                                    </th>
                                     <th><?php echo esc_html__( 'Actions', 'intellisend' ); ?></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ( $reports as $report ) : ?>
                                     <tr>
+                                        <td class="checkbox-column">
+                                            <input type="checkbox" class="report-checkbox" data-id="<?php echo esc_attr( $report->id ); ?>">
+                                        </td>
                                         <td><?php echo esc_html( date( 'Y-m-d H:i', strtotime( $report->date ) ) ); ?></td>
                                         <td>
                                             <span class="status-badge" data-status="<?php echo esc_attr( $report->status ); ?>">
@@ -185,8 +262,8 @@ function intellisend_render_reports_page_content() {
                             <div class="intellisend-pagination">
                                 <div class="pagination-info">
                                     <?php
-                                    $from = min( $offset + 1, $total_reports );
-                                    $to = min( $offset + $per_page, $total_reports );
+                                    $from = min( ( $page - 1 ) * $per_page + 1, $total_reports );
+                                    $to = min( $page * $per_page, $total_reports );
                                     printf(
                                         esc_html__( 'Showing %1$d to %2$d of %3$d entries', 'intellisend' ),
                                         $from,
@@ -326,7 +403,7 @@ function intellisend_render_reports_page_content() {
                 </div>
                 
                 <div class="report-section">
-                    <h3><?php echo esc_html__( 'Headers', 'intellisend' ); ?></h3>
+                    <h3><?php echo esc_html__( 'Log', 'intellisend' ); ?></h3>
                     <div id="report-headers" class="report-message"></div>
                 </div>
                 

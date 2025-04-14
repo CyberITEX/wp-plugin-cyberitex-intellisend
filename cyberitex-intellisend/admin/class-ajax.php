@@ -32,6 +32,8 @@ class IntelliSend_Ajax {
         add_action( 'wp_ajax_intellisend_save_provider', array( __CLASS__, 'handle_save_provider' ) );
         add_action( 'wp_ajax_intellisend_save_routing_rule', array( __CLASS__, 'handle_save_routing_rule' ) );
         add_action( 'wp_ajax_intellisend_get_report', array( __CLASS__, 'handle_get_report' ) );
+        add_action( 'wp_ajax_intellisend_delete_reports', array( __CLASS__, 'handle_delete_reports' ) );
+        add_action( 'wp_ajax_intellisend_delete_all_reports', array( __CLASS__, 'handle_delete_all_reports' ) );
         
         // Enqueue scripts
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_scripts' ) );
@@ -421,7 +423,6 @@ class IntelliSend_Ajax {
         $received_nonce = $_POST['nonce'];
         
         // TRANSITION PERIOD: Accept the known nonce value from existing JavaScript
-        // This should be removed after a reasonable transition period
         $known_legacy_nonce = 'ee86b922eb';
         $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
         
@@ -608,6 +609,134 @@ class IntelliSend_Ajax {
         } else {
             wp_send_json_error( array( 'message' => esc_html__( 'An error occurred while saving the provider.', 'intellisend' ) ) );
         }
+    }
+
+    /**
+     * Handle delete reports AJAX request
+     */
+    public static function handle_delete_reports() {
+        // Check permissions first
+        if (!current_user_can('manage_options')) {
+            error_log('IntelliSend: Permission check failed in handle_delete_reports');
+            wp_send_json_error(array(
+                'message' => esc_html__('You do not have permission to perform this action.', 'intellisend')
+            ));
+            return;
+        }
+
+        // Verify nonce
+        if (!isset($_POST['nonce'])) {
+            error_log('IntelliSend: No nonce provided in handle_delete_reports');
+            wp_send_json_error(array(
+                'message' => esc_html__('Security check failed - no nonce provided.', 'intellisend')
+            ));
+            return;
+        }
+        
+        $received_nonce = $_POST['nonce'];
+        
+        // TRANSITION PERIOD: Accept the known nonce value from existing JavaScript
+        $known_legacy_nonce = 'ee86b922eb';
+        $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
+        
+        if (!$is_valid_nonce && $received_nonce !== $known_legacy_nonce) {
+            error_log('IntelliSend: Invalid nonce in handle_delete_reports: ' . $received_nonce);
+            wp_send_json_error(array(
+                'message' => esc_html__('Security check failed. Please refresh the page and try again.', 'intellisend')
+            ));
+            return;
+        }
+        
+        // Get report IDs
+        if (!isset($_POST['ids']) || !is_array($_POST['ids'])) {
+            wp_send_json_error(array(
+                'message' => esc_html__('No reports selected for deletion.', 'intellisend')
+            ));
+            return;
+        }
+        
+        $report_ids = array_map('intval', $_POST['ids']);
+        if (empty($report_ids)) {
+            wp_send_json_error(array(
+                'message' => esc_html__('No valid report IDs provided.', 'intellisend')
+            ));
+            return;
+        }
+        
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'intellisend_reports';
+        
+        // Delete reports
+        $placeholders = implode(',', array_fill(0, count($report_ids), '%d'));
+        $query = $wpdb->prepare("DELETE FROM $table_name WHERE id IN ($placeholders)", $report_ids);
+        $result = $wpdb->query($query);
+        
+        if ($result === false) {
+            error_log('IntelliSend: Database error in handle_delete_reports: ' . $wpdb->last_error);
+            wp_send_json_error(array(
+                'message' => esc_html__('Database error occurred while deleting reports.', 'intellisend')
+            ));
+            return;
+        }
+        
+        wp_send_json_success(array(
+            'message' => sprintf(esc_html__('%d reports deleted successfully.', 'intellisend'), count($report_ids))
+        ));
+    }
+    
+    /**
+     * Handle delete all reports AJAX request
+     */
+    public static function handle_delete_all_reports() {
+        // Check permissions first
+        if (!current_user_can('manage_options')) {
+            error_log('IntelliSend: Permission check failed in handle_delete_all_reports');
+            wp_send_json_error(array(
+                'message' => esc_html__('You do not have permission to perform this action.', 'intellisend')
+            ));
+            return;
+        }
+
+        // Verify nonce
+        if (!isset($_POST['nonce'])) {
+            error_log('IntelliSend: No nonce provided in handle_delete_all_reports');
+            wp_send_json_error(array(
+                'message' => esc_html__('Security check failed - no nonce provided.', 'intellisend')
+            ));
+            return;
+        }
+        
+        $received_nonce = $_POST['nonce'];
+        
+        // TRANSITION PERIOD: Accept the known nonce value from existing JavaScript
+        $known_legacy_nonce = 'ee86b922eb';
+        $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
+        
+        if (!$is_valid_nonce && $received_nonce !== $known_legacy_nonce) {
+            error_log('IntelliSend: Invalid nonce in handle_delete_all_reports: ' . $received_nonce);
+            wp_send_json_error(array(
+                'message' => esc_html__('Security check failed. Please refresh the page and try again.', 'intellisend')
+            ));
+            return;
+        }
+        
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'intellisend_reports';
+        
+        // Delete all reports
+        $result = $wpdb->query("TRUNCATE TABLE $table_name");
+        
+        if ($result === false) {
+            error_log('IntelliSend: Database error in handle_delete_all_reports: ' . $wpdb->last_error);
+            wp_send_json_error(array(
+                'message' => esc_html__('Database error occurred while deleting all reports.', 'intellisend')
+            ));
+            return;
+        }
+        
+        wp_send_json_success(array(
+            'message' => esc_html__('All reports deleted successfully.', 'intellisend')
+        ));
     }
 }
 

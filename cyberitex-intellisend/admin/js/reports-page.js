@@ -16,6 +16,8 @@
             this.setupEventListeners();
             this.setupDatePickers();
             this.setupStatusBadges();
+            this.setupSortableColumns();
+            this.setupRecordSelection();
             this.injectCustomStyles();
         },
 
@@ -71,6 +73,30 @@
                     });
                 }
             });
+            
+            // Bulk action apply button
+            $(document).on('click', '#bulk-action-apply', function() {
+                const action = $('#bulk-action-selector').val();
+                if (!action) {
+                    self.showNotification('error', 'Please select an action');
+                    return;
+                }
+                
+                const selectedIds = self.getSelectedReportIds();
+                if (selectedIds.length === 0) {
+                    self.showNotification('error', 'Please select at least one report');
+                    return;
+                }
+                
+                if (action === 'delete') {
+                    self.confirmDeleteReports(selectedIds);
+                }
+            });
+            
+            // Delete all reports button
+            $(document).on('click', '#delete-all-reports', function() {
+                self.confirmDeleteAllReports();
+            });
         },
         
         /**
@@ -104,6 +130,243 @@
             $('.status-badge').each(function() {
                 const status = $(this).data('status');
                 $(this).addClass('status-' + status);
+            });
+        },
+        
+        /**
+         * Set up sortable columns
+         */
+        setupSortableColumns: function() {
+            const self = this;
+            
+            // Handle sortable column clicks
+            $(document).on('click', '.intellisend-table th.sortable', function() {
+                const column = $(this).data('sort');
+                if (!column) return;
+                
+                // Get current URL and parameters
+                let currentUrl = new URL(window.location.href);
+                let params = new URLSearchParams(currentUrl.search);
+                
+                // Determine sort order
+                let order = 'asc';
+                if (params.get('orderby') === column) {
+                    order = params.get('order') === 'asc' ? 'desc' : 'asc';
+                }
+                
+                // Update URL parameters
+                params.set('orderby', column);
+                params.set('order', order);
+                
+                // Redirect to new URL
+                currentUrl.search = params.toString();
+                window.location.href = currentUrl.toString();
+            });
+        },
+        
+        /**
+         * Set up record selection
+         */
+        setupRecordSelection: function() {
+            const self = this;
+            
+            // Select all checkbox
+            $(document).on('change', '#select-all-reports', function() {
+                const isChecked = $(this).prop('checked');
+                $('.report-checkbox').prop('checked', isChecked);
+                self.updateSelectedRowsHighlight();
+                self.updateSelectedCount();
+            });
+            
+            // Individual checkboxes
+            $(document).on('change', '.report-checkbox', function() {
+                self.updateSelectAllCheckbox();
+                self.updateSelectedRowsHighlight();
+                self.updateSelectedCount();
+            });
+            
+            // Make row clickable for selection
+            $(document).on('click', '.intellisend-table tbody tr', function(e) {
+                // Don't toggle if clicking on action buttons or links
+                if ($(e.target).is('button, a, .dashicons') || $(e.target).closest('button, a').length) {
+                    return;
+                }
+                
+                const $checkbox = $(this).find('.report-checkbox');
+                $checkbox.prop('checked', !$checkbox.prop('checked')).trigger('change');
+            });
+            
+            // Initialize selected count
+            this.updateSelectedCount();
+        },
+        
+        /**
+         * Update the "Select All" checkbox state
+         */
+        updateSelectAllCheckbox: function() {
+            const totalCheckboxes = $('.report-checkbox').length;
+            const checkedCheckboxes = $('.report-checkbox:checked').length;
+            
+            if (checkedCheckboxes === 0) {
+                $('#select-all-reports').prop('checked', false).prop('indeterminate', false);
+            } else if (checkedCheckboxes === totalCheckboxes) {
+                $('#select-all-reports').prop('checked', true).prop('indeterminate', false);
+            } else {
+                $('#select-all-reports').prop('checked', false).prop('indeterminate', true);
+            }
+        },
+        
+        /**
+         * Update the selected count display
+         */
+        updateSelectedCount: function() {
+            const selectedCount = $('.report-checkbox:checked').length;
+            $('#selected-count').text(selectedCount);
+        },
+        
+        /**
+         * Update row highlighting based on selection
+         */
+        updateSelectedRowsHighlight: function() {
+            $('.intellisend-table tbody tr').each(function() {
+                const isChecked = $(this).find('.report-checkbox').prop('checked');
+                $(this).toggleClass('selected', isChecked);
+            });
+        },
+        
+        /**
+         * Get array of selected report IDs
+         */
+        getSelectedReportIds: function() {
+            const selectedIds = [];
+            $('.report-checkbox:checked').each(function() {
+                selectedIds.push($(this).data('id'));
+            });
+            return selectedIds;
+        },
+        
+        /**
+         * Confirm deletion of selected reports
+         */
+        confirmDeleteReports: function(reportIds) {
+            if (!reportIds || !reportIds.length) return;
+            
+            if (confirm('Are you sure you want to delete the selected reports? This action cannot be undone.')) {
+                this.deleteReports(reportIds);
+            }
+        },
+        
+        /**
+         * Confirm deletion of all reports
+         */
+        confirmDeleteAllReports: function() {
+            if (confirm('Are you sure you want to delete ALL reports? This action cannot be undone.')) {
+                this.deleteAllReports();
+            }
+        },
+        
+        /**
+         * Delete selected reports
+         */
+        deleteReports: function(reportIds) {
+            const self = this;
+            
+            // Show loading state
+            const $deleteButton = $('#bulk-action-apply');
+            self.setButtonLoading($deleteButton, 'Deleting...');
+            
+            // Determine which nonce to use with proper fallbacks
+            let nonceToUse = '';
+            if (typeof intellisendData !== 'undefined' && intellisendData.nonce) {
+                nonceToUse = intellisendData.nonce;
+            } else if (typeof intellisend_ajax !== 'undefined' && intellisend_ajax.nonce) {
+                nonceToUse = intellisend_ajax.nonce;
+            } else {
+                nonceToUse = 'ee86b922eb'; // Legacy fallback
+            }
+            
+            // Determine AJAX URL
+            const ajaxUrlToUse = typeof intellisendData !== 'undefined' && intellisendData.ajaxurl ? 
+                intellisendData.ajaxurl : (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
+            
+            // Send AJAX request
+            $.ajax({
+                url: ajaxUrlToUse,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_delete_reports',
+                    ids: reportIds,
+                    nonce: nonceToUse
+                },
+                success: function(response) {
+                    self.resetButtonLoading($deleteButton);
+                    
+                    if (response.success) {
+                        self.showNotification('success', response.data.message || 'Reports deleted successfully');
+                        // Reload the page after a short delay
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        self.showNotification('error', response.data.message || 'Failed to delete reports');
+                    }
+                },
+                error: function() {
+                    self.resetButtonLoading($deleteButton);
+                    self.showNotification('error', 'A network error occurred');
+                }
+            });
+        },
+        
+        /**
+         * Delete all reports
+         */
+        deleteAllReports: function() {
+            const self = this;
+            
+            // Show loading state
+            const $deleteButton = $('#delete-all-reports');
+            self.setButtonLoading($deleteButton, 'Deleting...');
+            
+            // Determine which nonce to use with proper fallbacks
+            let nonceToUse = '';
+            if (typeof intellisendData !== 'undefined' && intellisendData.nonce) {
+                nonceToUse = intellisendData.nonce;
+            } else if (typeof intellisend_ajax !== 'undefined' && intellisend_ajax.nonce) {
+                nonceToUse = intellisend_ajax.nonce;
+            } else {
+                nonceToUse = 'ee86b922eb'; // Legacy fallback
+            }
+            
+            // Determine AJAX URL
+            const ajaxUrlToUse = typeof intellisendData !== 'undefined' && intellisendData.ajaxurl ? 
+                intellisendData.ajaxurl : (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
+            
+            // Send AJAX request
+            $.ajax({
+                url: ajaxUrlToUse,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_delete_all_reports',
+                    nonce: nonceToUse
+                },
+                success: function(response) {
+                    self.resetButtonLoading($deleteButton);
+                    
+                    if (response.success) {
+                        self.showNotification('success', response.data.message || 'All reports deleted successfully');
+                        // Reload the page after a short delay
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        self.showNotification('error', response.data.message || 'Failed to delete reports');
+                    }
+                },
+                error: function() {
+                    self.resetButtonLoading($deleteButton);
+                    self.showNotification('error', 'A network error occurred');
+                }
             });
         },
         
