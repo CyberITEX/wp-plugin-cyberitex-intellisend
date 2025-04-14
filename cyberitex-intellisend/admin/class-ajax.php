@@ -31,6 +31,7 @@ class IntelliSend_Ajax {
         // Direct action handlers
         add_action( 'wp_ajax_intellisend_save_provider', array( __CLASS__, 'handle_save_provider' ) );
         add_action( 'wp_ajax_intellisend_save_routing_rule', array( __CLASS__, 'handle_save_routing_rule' ) );
+        add_action( 'wp_ajax_intellisend_get_report', array( __CLASS__, 'handle_get_report' ) );
         
         // Enqueue scripts
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_scripts' ) );
@@ -214,17 +215,10 @@ class IntelliSend_Ajax {
         if (!empty($provider_id)) {
             // Get the provider by ID
             $provider = IntelliSend_Database::get_provider_by_name($provider_id);
-            // Log provider details
-            error_log('IntelliSend Test Email - Provider details: ' . ($provider ? json_encode(array(
-                'id' => $provider->id,
-                'name' => $provider->name,
-                'server' => $provider->server
-            )) : 'Provider not found'));
         } else {
             // Otherwise, get the default provider from settings
             $settings = IntelliSend_Database::get_settings();
             $default_provider_id = $settings->defaultProviderName;
-            error_log('IntelliSend Test Email - Default Provider ID: ' . $default_provider_id);
             $provider = IntelliSend_Database::get_provider_by_name($default_provider_id);
         }
         
@@ -235,7 +229,7 @@ class IntelliSend_Ajax {
         
         // Set up the email
         $to = $test_email_address;
-        $subject = 'IntelliSend Test Email';
+        $subject = '[CyberITEX] IntelliSend Test Email';
         $message = 'This is a test email from IntelliSend. If you received this, your SMTP settings are working correctly.';
         $headers = array(
             'Content-Type: text/html; charset=UTF-8',
@@ -384,6 +378,90 @@ class IntelliSend_Ajax {
             // Send error response
             $error_message = isset($spam_result['message']) ? $spam_result['message'] : esc_html__( 'Spam check failed. Please check your API key and endpoint.', 'intellisend' );
             wp_send_json_error( array( 'message' => $error_message ) );
+        }
+    }
+
+    /**
+     * Handle get report AJAX request
+     */
+    public static function handle_get_report() {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_reports_nonce')) {
+            error_log('IntelliSend: Nonce verification failed in handle_get_report');
+            wp_send_json_error(array(
+                'message' => esc_html__('Security check failed.', 'intellisend')
+            ));
+            return;
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            error_log('IntelliSend: Permission check failed in handle_get_report');
+            wp_send_json_error(array(
+                'message' => esc_html__('You do not have permission to perform this action.', 'intellisend')
+            ));
+            return;
+        }
+
+        // Get report ID
+        $report_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+        if (!$report_id) {
+            error_log('IntelliSend: Invalid report ID in handle_get_report');
+            wp_send_json_error(array(
+                'message' => esc_html__('Invalid report ID.', 'intellisend')
+            ));
+            return;
+        }
+
+        try {
+            error_log('IntelliSend: Attempting to get report with ID: ' . $report_id);
+            
+            // Get report from database
+            $report = IntelliSend_Database::get_report($report_id);
+            if (!$report) {
+                error_log('IntelliSend: Report not found with ID: ' . $report_id);
+                wp_send_json_error(array(
+                    'message' => esc_html__('Report not found.', 'intellisend')
+                ));
+                return;
+            }
+            
+            // Get routing rule name if applicable
+            $routing_rule_name = esc_html__('Default Routing', 'intellisend');
+            if (!empty($report->routing_rule_id)) {
+                $routing_rule = IntelliSend_Database::get_routing_rule($report->routing_rule_id);
+                if ($routing_rule) {
+                    $routing_rule_name = $routing_rule->name;
+                }
+            }
+            
+            // Format report data for response - ensure field names match what JavaScript expects
+            $report_data = array(
+                'id' => $report->id,
+                'date' => $report->date,
+                'status' => $report->status,
+                'sender' => $report->sender,
+                'recipients' => $report->recipients,
+                'subject' => $report->subject,
+                'message' => $report->message,
+                'providerName' => $report->providerName,
+                'routingRuleName' => $routing_rule_name,
+                'log' => $report->log,
+                'isSpam' => (bool) $report->isSpam,
+                'spamScore' => isset($report->spamScore) ? $report->spamScore : '',
+                'errorMessage' => isset($report->errorMessage) ? $report->errorMessage : ''
+            );
+            
+            // Log the response for debugging
+            error_log('IntelliSend: Report data successfully retrieved for ID: ' . $report_id);
+            
+            wp_send_json_success($report_data);
+        } catch (Exception $e) {
+            error_log('IntelliSend Error: ' . $e->getMessage());
+            wp_send_json_error(array(
+                'message' => esc_html__('An error occurred while retrieving the report.', 'intellisend'),
+                'error' => $e->getMessage()
+            ));
         }
     }
 

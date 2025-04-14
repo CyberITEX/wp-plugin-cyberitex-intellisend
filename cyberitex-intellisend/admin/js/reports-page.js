@@ -26,30 +26,39 @@
             const self = this;
             
             // View report
-            $('.view-report').on('click', function() {
+            $(document).on('click', '.view-report', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
                 self.viewReport($(this).data('id'));
             });
             
             // Close modal
-            $('.intellisend-modal-close').on('click', function() {
+            $(document).on('click', '.intellisend-modal-close', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
                 self.closeModal($(this).closest('.intellisend-modal'));
             });
             
             // Click outside modal to close
-            $(window).on('click', function(event) {
+            $(document).on('click', '.intellisend-modal', function(event) {
                 if ($(event.target).hasClass('intellisend-modal')) {
                     self.closeModal($(event.target));
                 }
             });
             
+            // Prevent clicks inside modal from closing it
+            $(document).on('click', '.intellisend-modal-content', function(e) {
+                e.stopPropagation();
+            });
+            
             // Filter form reset
-            $('#reset-filters').on('click', function(e) {
+            $(document).on('click', '#reset-filters', function(e) {
                 e.preventDefault();
                 self.resetFilters();
             });
             
             // Filter form submit with loading state
-            $('#filter-form').on('submit', function() {
+            $(document).on('submit', '#filter-form', function() {
                 const $submitButton = $(this).find('button[type="submit"]');
                 self.setButtonLoading($submitButton, 'Filtering...');
             });
@@ -104,13 +113,17 @@
         viewReport: function(reportId) {
             const self = this;
             
+            console.log('Opening modal for report ID:', reportId);
+            console.log('Using AJAX URL:', intellisendData.ajaxUrl);
+            console.log('Using nonce:', intellisendData.nonce);
+            
             // Show loading state in modal
             $('#view-report-modal').addClass('loading');
             $('#view-report-modal').show();
             
             // Get report data via AJAX
             $.ajax({
-                url: ajaxurl,
+                url: intellisendData.ajaxUrl,
                 type: 'POST',
                 data: {
                     action: 'intellisend_get_report',
@@ -118,19 +131,25 @@
                     nonce: intellisendData.nonce
                 },
                 success: function(response) {
+                    console.log('AJAX response:', response);
+                    $('#view-report-modal').removeClass('loading');
+                    
                     if (response.success) {
+                        console.log('Report data:', response.data);
                         self.populateReportModal(response.data);
                     } else {
-                        self.showNotification('error', response.data || 'Failed to load report details.');
+                        console.error('Error response:', response);
+                        self.showNotification('error', response.data && response.data.message ? response.data.message : 'Failed to load report details.');
                         self.closeModal($('#view-report-modal'));
                     }
                 },
-                error: function() {
+                error: function(xhr, status, error) {
+                    $('#view-report-modal').removeClass('loading');
+                    console.error('AJAX error:', error);
+                    console.error('Status:', status);
+                    console.error('Response:', xhr.responseText);
                     self.showNotification('error', 'A network error occurred while loading the report.');
                     self.closeModal($('#view-report-modal'));
-                },
-                complete: function() {
-                    $('#view-report-modal').removeClass('loading');
                 }
             });
         },
@@ -139,36 +158,45 @@
          * Populate report modal with data
          */
         populateReportModal: function(report) {
-            // Fill the modal with report data
-            $('#report-date').text(this.formatDate(report.date));
-            $('#report-status').html(this.getStatusBadgeHtml(report.status));
-            $('#report-provider').text(report.defaultProviderName || 'N/A');
-            $('#report-routing').text(report.routingRuleName || 'N/A');
-            $('#report-from').text(report.sender || 'N/A');
-            $('#report-to').text(report.recipients || 'N/A');
-            $('#report-subject').text(report.subject || 'N/A');
-            
-            // Format message with syntax highlighting if possible
-            const messageHtml = report.message ? report.message.replace(/\n/g, '<br>') : 'No message content available';
-            $('#report-message').html(messageHtml);
-            
-            // Headers
-            $('#report-headers').text(report.log || 'No headers available');
-            
-            // Show/hide spam section
-            if (report.isSpam) {
-                $('#report-spam-section').show();
-                $('#report-spam-score').text(report.spamScore || 'N/A');
-            } else {
-                $('#report-spam-section').hide();
-            }
-            
-            // Show/hide error section
-            if (report.status === 'error') {
-                $('#report-error-section').show();
-                $('#report-error-message').text(report.errorMessage || 'Unknown error');
-            } else {
-                $('#report-error-section').hide();
+            try {
+                console.log('Populating modal with data:', report);
+                
+                // Fill the modal with report data
+                $('#report-date').text(this.formatDate(report.date) || 'N/A');
+                $('#report-status').html(this.getStatusBadgeHtml(report.status || 'unknown'));
+                $('#report-provider').text(report.providerName || 'N/A');
+                $('#report-routing').text(report.routingRuleName || 'N/A');
+                $('#report-from').text(report.sender || 'N/A');
+                $('#report-to').text(report.recipients || 'N/A');
+                $('#report-subject').text(report.subject || 'N/A');
+                
+                // Format message with syntax highlighting if possible
+                const messageHtml = report.message ? report.message.replace(/\n/g, '<br>') : 'No message content available';
+                $('#report-message').html(messageHtml);
+                
+                // Headers
+                $('#report-headers').text(report.log || 'No headers available');
+                
+                // Show/hide spam section
+                if (report.isSpam) {
+                    $('#report-spam-section').show();
+                    $('#report-spam-score').text(report.spamScore || 'N/A');
+                } else {
+                    $('#report-spam-section').hide();
+                }
+                
+                // Show/hide error section
+                if (report.status === 'error') {
+                    $('#report-error-section').show();
+                    $('#report-error-message').text(report.errorMessage || 'Unknown error');
+                } else {
+                    $('#report-error-section').hide();
+                }
+                
+                console.log('Modal populated successfully');
+            } catch (error) {
+                console.error('Error populating modal:', error);
+                this.showNotification('error', 'Error displaying report details');
             }
         },
         
@@ -200,6 +228,11 @@
          * Close modal
          */
         closeModal: function($modal) {
+            if (!$modal) {
+                console.error('Modal not found');
+                return;
+            }
+            console.log('Closing modal:', $modal.attr('id'));
             $modal.hide();
         },
         

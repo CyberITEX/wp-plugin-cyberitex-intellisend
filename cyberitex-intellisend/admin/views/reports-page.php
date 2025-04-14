@@ -37,8 +37,8 @@ function intellisend_render_reports_page_content() {
     }
 
     // Provider filter
-    if ( isset( $_GET['defaultProviderName'] ) && ! empty( $_GET['defaultProviderName'] ) ) {
-        $filters['defaultProviderName'] = sanitize_text_field( $_GET['defaultProviderName'] );
+    if ( isset( $_GET['providerName'] ) && ! empty( $_GET['providerName'] ) ) {
+        $filters['providerName'] = sanitize_text_field( $_GET['providerName'] );
     }
 
     // Routing rule filter
@@ -97,10 +97,10 @@ function intellisend_render_reports_page_content() {
                             
                             <div class="filter-item">
                                 <label for="filter-provider"><?php echo esc_html__( 'Provider', 'intellisend' ); ?></label>
-                                <select id="filter-provider" name="defaultProviderName">
+                                <select id="filter-provider" name="providerName">
                                     <option value=""><?php echo esc_html__( 'All', 'intellisend' ); ?></option>
                                     <?php foreach ( $providers as $provider ) : ?>
-                                        <option value="<?php echo esc_attr( $provider->name ); ?>" <?php selected( isset( $_GET['defaultProviderName'] ) ? $_GET['defaultProviderName'] : '', $provider->name ); ?>>
+                                        <option value="<?php echo esc_attr( $provider->name ); ?>" <?php selected( isset( $_GET['providerName'] ) ? $_GET['providerName'] : '', $provider->name ); ?>>
                                             <?php echo esc_html( $provider->name ); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -170,7 +170,7 @@ function intellisend_render_reports_page_content() {
                                         <td><?php echo esc_html( $report->subject ); ?></td>
                                         <td><?php echo esc_html( $report->sender ); ?></td>
                                         <td><?php echo esc_html( $report->recipients ); ?></td>
-                                        <td><?php echo esc_html( $report->defaultProviderName ); ?></td>
+                                        <td><?php echo esc_html( $report->providerName ); ?></td>
                                         <td>
                                             <button type="button" class="action-button view-report" data-id="<?php echo esc_attr( $report->id ); ?>" title="<?php echo esc_attr__( 'View Details', 'intellisend' ); ?>">
                                                 <span class="dashicons dashicons-visibility"></span>
@@ -373,5 +373,3 @@ function intellisend_enqueue_reports_assets() {
     }
 }
 add_action( 'admin_enqueue_scripts', 'intellisend_enqueue_reports_assets' );
-
-
