@@ -230,23 +230,26 @@ class IntelliSend_Ajax {
         // Set up the email
         $to = $test_email_address;
         $subject = '[CyberITEX] IntelliSend Test Email';
-        $message = 'This is a test email from IntelliSend. If you received this, your SMTP settings are working correctly.';
+        $message = 'This is a test email from IntelliSend using provider "' . $provider->name . '". If you received this, your SMTP settings are working correctly.';
         $headers = array(
             'Content-Type: text/html; charset=UTF-8',
-            'From: IntelliSend <' . $test_email_address . '>',
+            'From: IntelliSend <' . $provider->sender . '>',
         );
         
         // Configure PHPMailer to use the selected SMTP provider
-        add_filter( 'wp_mail_from', function( $email ) use ( $test_email_address ) {
-            return $test_email_address;
+        add_filter( 'wp_mail_from', function( $email ) use ( $provider ) {
+            return $provider->sender;
         });
         
         add_filter( 'wp_mail_from_name', function( $name ) {
             return 'IntelliSend Test';
         });
         
+        // Capture debug output
+        $debug_output = '';
+        
         // Configure PHPMailer to use SMTP
-        add_action( 'phpmailer_init', function( $phpmailer ) use ( $provider ) {
+        add_action( 'phpmailer_init', function( $phpmailer ) use ( $provider, &$debug_output ) {
             $phpmailer->isSMTP();
             $phpmailer->Host = $provider->server;
             $phpmailer->Port = $provider->port;
@@ -272,14 +275,25 @@ class IntelliSend_Ajax {
             };
         });
         
-        // Capture debug output
-        $debug_output = '';
-        
         // Set a flag to bypass the mail interception for test emails
         $GLOBALS['intellisend_test_email'] = true;
         
         // Send the test email
         $result = wp_mail( $to, $subject, $message, $headers );
+        error_log('IntelliSend Test Email sent result: ' . var_export($result, true));
+        
+        // Extract and log only the error part if there is an error
+        if (!$result && !empty($debug_output)) {
+            // Look for error messages in the debug output
+            if (preg_match('/SERVER -> CLIENT: (5\d{2}.*?)(?:\n|$)/s', $debug_output, $matches) || 
+                preg_match('/SMTP ERROR: (.*?)(?:\n|$)/s', $debug_output, $matches)) {
+                error_log('IntelliSend SMTP Error: ' . $matches[1]);
+                // Set debug_output to only contain the error message
+                $debug_output = $matches[1];
+            } else {
+                error_log('IntelliSend Debug Output: ' . var_export($debug_output, true));
+            }
+        }
         
         // Reset the flag
         $GLOBALS['intellisend_test_email'] = false;
@@ -293,6 +307,7 @@ class IntelliSend_Ajax {
             $error_details .= "Port: " . $provider->port . "\n";
             $error_details .= "Encryption: " . $provider->encryption . "\n";
             $error_details .= "Username: " . $provider->username . "\n";
+            $error_details .= "Sender: " . $provider->sender . "\n";
             // Don't include the password for security reasons
         }
         
