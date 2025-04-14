@@ -354,22 +354,22 @@ function intellisend_render_reports_page_content() {
     </div>
     
     <?php
-    // Localize script data
-    wp_localize_script(
-        'intellisend-reports-js',
-        'intellisendData',
-        array(
-            'nonce' => wp_create_nonce( 'intellisend_reports_nonce' ),
-            'ajaxUrl' => admin_url( 'admin-ajax.php' )
-        )
-    );
-}
-
-// Enqueue styles and scripts
-function intellisend_enqueue_reports_assets() {
-    if ( isset( $_GET['page'] ) && $_GET['page'] === 'intellisend-reports' ) {
-        wp_enqueue_style( 'intellisend-reports-css', INTELLISEND_PLUGIN_URL . 'admin/css/reports-page.css', array(), INTELLISEND_VERSION );
-        wp_enqueue_script( 'intellisend-reports-js', INTELLISEND_PLUGIN_URL . 'admin/js/reports-page.js', array( 'jquery' ), INTELLISEND_VERSION, true );
+    // Enqueue styles and scripts
+    function intellisend_enqueue_reports_assets() {
+        if ( isset( $_GET['page'] ) && $_GET['page'] === 'intellisend-reports' ) {
+            wp_enqueue_style( 'intellisend-reports-css', INTELLISEND_PLUGIN_URL . 'admin/css/reports-page.css', array(), INTELLISEND_VERSION );
+            wp_enqueue_script( 'intellisend-reports-js', INTELLISEND_PLUGIN_URL . 'admin/js/reports-page.js', array( 'jquery' ), INTELLISEND_VERSION, true );
+            
+            // Localize the script with necessary data including nonce
+            wp_localize_script( 'intellisend-reports-js', 'intellisendData', array(
+                'nonce' => wp_create_nonce( 'intellisend_ajax_nonce' ),
+                'ajaxurl' => admin_url( 'admin-ajax.php' ),
+                'i18n' => array(
+                    'loadingText' => __( 'Loading...', 'intellisend' ),
+                    'errorText' => __( 'Error loading report', 'intellisend' )
+                )
+            ));
+        }
     }
+    add_action( 'admin_enqueue_scripts', 'intellisend_enqueue_reports_assets' );
 }
-add_action( 'admin_enqueue_scripts', 'intellisend_enqueue_reports_assets' );

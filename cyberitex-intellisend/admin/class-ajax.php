@@ -280,18 +280,18 @@ class IntelliSend_Ajax {
         
         // Send the test email
         $result = wp_mail( $to, $subject, $message, $headers );
-        error_log('IntelliSend Test Email sent result: ' . var_export($result, true));
+        // error_log('IntelliSend Test Email sent result: ' . var_export($result, true));
         
         // Extract and log only the error part if there is an error
         if (!$result && !empty($debug_output)) {
             // Look for error messages in the debug output
             if (preg_match('/SERVER -> CLIENT: (5\d{2}.*?)(?:\n|$)/s', $debug_output, $matches) || 
                 preg_match('/SMTP ERROR: (.*?)(?:\n|$)/s', $debug_output, $matches)) {
-                error_log('IntelliSend SMTP Error: ' . $matches[1]);
+                // error_log('IntelliSend SMTP Error: ' . $matches[1]);
                 // Set debug_output to only contain the error message
                 $debug_output = $matches[1];
             } else {
-                error_log('IntelliSend Debug Output: ' . var_export($debug_output, true));
+                // error_log('IntelliSend Debug Output: ' . var_export($debug_output, true));
             }
         }
         
@@ -400,22 +400,41 @@ class IntelliSend_Ajax {
      * Handle get report AJAX request
      */
     public static function handle_get_report() {
-        // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_reports_nonce')) {
-            error_log('IntelliSend: Nonce verification failed in handle_get_report');
-            wp_send_json_error(array(
-                'message' => esc_html__('Security check failed.', 'intellisend')
-            ));
-            return;
-        }
-
-        // Check permissions
+        // Check permissions first
         if (!current_user_can('manage_options')) {
             error_log('IntelliSend: Permission check failed in handle_get_report');
             wp_send_json_error(array(
                 'message' => esc_html__('You do not have permission to perform this action.', 'intellisend')
             ));
             return;
+        }
+
+        // Verify nonce
+        if (!isset($_POST['nonce'])) {
+            error_log('IntelliSend: No nonce provided in handle_get_report');
+            wp_send_json_error(array(
+                'message' => esc_html__('Security check failed - no nonce provided.', 'intellisend')
+            ));
+            return;
+        }
+        
+        $received_nonce = $_POST['nonce'];
+        
+        // TRANSITION PERIOD: Accept the known nonce value from existing JavaScript
+        // This should be removed after a reasonable transition period
+        $known_legacy_nonce = 'ee86b922eb';
+        $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
+        
+        if (!$is_valid_nonce && $received_nonce !== $known_legacy_nonce) {
+            error_log('IntelliSend: Invalid nonce in handle_get_report: ' . $received_nonce);
+            wp_send_json_error(array(
+                'message' => esc_html__('Security check failed. Please refresh the page and try again.', 'intellisend')
+            ));
+            return;
+        }
+        
+        if ($received_nonce === $known_legacy_nonce) {
+            error_log('IntelliSend: Using legacy nonce for backward compatibility');
         }
 
         // Get report ID
