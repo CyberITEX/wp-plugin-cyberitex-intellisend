@@ -36,6 +36,15 @@ function intellisend_ajax_get_routing_rule() {
         wp_send_json_error( __( 'Rule not found.', 'intellisend' ) );
     }
 
+    // Get configured providers to validate the rule's provider
+    $providers = IntelliSend_Database::get_providers( array( 'configured' => 1 ) );
+    $provider_names = array_map( function( $provider ) {
+        return $provider->name;
+    }, $providers );
+
+    // Add a flag to indicate if the rule's provider is still configured
+    $rule->providerConfigured = in_array( $rule->defaultProviderName, $provider_names );
+
     // Send response
     wp_send_json_success( $rule );
 }

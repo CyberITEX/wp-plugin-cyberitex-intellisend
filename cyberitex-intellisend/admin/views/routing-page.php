@@ -15,11 +15,21 @@ function intellisend_render_routing_page_content() {
     // Get all routing rules
     $routing_rules = IntelliSend_Database::get_routing_rules();
 
-    // Get all providers
-    $providers = IntelliSend_Database::get_providers();
+    // Get all configured providers
+    $providers = IntelliSend_Database::get_providers( array( 'configured' => 1 ) );
     ?>
     <div class="wrap intellisend-admin">
         <h1><?php echo esc_html__( 'Email Routing', 'intellisend' ); ?></h1>
+        
+        <?php if ( empty( $providers ) ) : ?>
+            <div class="intellisend-notice warning">
+                <span class="intellisend-notice-icon dashicons dashicons-warning"></span>
+                <div class="intellisend-notice-content">
+                    <?php echo esc_html__( 'No configured SMTP providers found. Please configure at least one provider in the SMTP Providers section before setting up routing rules.', 'intellisend' ); ?>
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=intellisend-providers' ) ); ?>" class="button button-secondary"><?php echo esc_html__( 'Configure Providers', 'intellisend' ); ?></a>
+                </div>
+            </div>
+        <?php endif; ?>
         
         <div class="intellisend-admin-content">
             <div class="intellisend-card">
@@ -259,7 +269,12 @@ function intellisend_render_routing_page_content() {
         'intellisendData',
         array(
             'nonce' => wp_create_nonce( 'intellisend_routing_nonce' ),
-            'ajaxUrl' => admin_url( 'admin-ajax.php' )
+            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+            'strings' => array(
+                'unconfiguredProvider' => __( 'The provider "%s" is not configured. Please select a configured provider or configure this provider in the SMTP Providers section.', 'intellisend' ),
+                'confirmDelete' => __( 'Are you sure you want to delete this routing rule? This action cannot be undone.', 'intellisend' ),
+                'noConfiguredProviders' => __( 'No configured SMTP providers found. Please configure at least one provider before adding routing rules.', 'intellisend' )
+            )
         )
     );
 }
@@ -272,5 +287,3 @@ function intellisend_enqueue_routing_assets() {
     }
 }
 add_action( 'admin_enqueue_scripts', 'intellisend_enqueue_routing_assets' );
-
-

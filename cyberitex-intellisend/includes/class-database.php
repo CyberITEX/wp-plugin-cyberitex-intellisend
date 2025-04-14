@@ -338,12 +338,38 @@ class IntelliSend_Database {
     /**
      * Get all providers
      * 
+     * @param array $args Optional. Query arguments.
      * @return array Array of provider objects
      */
-    public static function get_providers() {
+    public static function get_providers( $args = array() ) {
         global $wpdb;
         $table = $wpdb->prefix . 'intellisend_providers';
-        return $wpdb->get_results("SELECT * FROM $table ORDER BY name ASC");
+        
+        // Start building the query
+        $query = "SELECT * FROM $table WHERE 1=1";
+        
+        // Add filters if provided
+        if ( is_array( $args ) ) {
+            // Filter by configured status
+            if ( isset( $args['configured'] ) ) {
+                $query .= $wpdb->prepare( " AND configured = %d", absint( $args['configured'] ) );
+            }
+            
+            // Filter by name
+            if ( isset( $args['name'] ) ) {
+                $query .= $wpdb->prepare( " AND name = %s", $args['name'] );
+            }
+            
+            // Filter by auth required
+            if ( isset( $args['authRequired'] ) ) {
+                $query .= $wpdb->prepare( " AND authRequired = %d", absint( $args['authRequired'] ) );
+            }
+        }
+        
+        // Add ordering
+        $query .= " ORDER BY name ASC";
+        
+        return $wpdb->get_results( $query );
     }
     
     /**

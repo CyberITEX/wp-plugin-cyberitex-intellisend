@@ -195,6 +195,19 @@
             $('#edit-rule-priority').val(rule.priority);
             $('#edit-rule-enabled').prop('checked', rule.enabled);
             
+            // Check if the provider is still configured
+            if (!rule.providerConfigured) {
+                // Show warning about unconfigured provider
+                const warningHtml = `
+                    <div class="form-warning">
+                        <span class="dashicons dashicons-warning"></span>
+                        <p>${intellisendData.strings.unconfiguredProvider.replace('%s', rule.defaultProviderName)}</p>
+                    </div>
+                `;
+                $('#edit-rule-provider').after(warningHtml);
+                $('#edit-rule-provider').addClass('has-warning');
+            }
+            
             // Focus first field
             $('#edit-rule-name').focus();
         },
