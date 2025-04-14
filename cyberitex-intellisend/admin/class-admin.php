@@ -230,11 +230,26 @@ class IntelliSend_Admin
                 );
 
                 wp_enqueue_script(
-                    'intellisend-providers-script',
+                    'intellisend-routing-js',
                     INTELLISEND_PLUGIN_URL . 'admin/js/routing-page.js',
                     array('jquery'),
                     INTELLISEND_VERSION,
                     false
+                );
+                
+                // Localize script with routing-specific data
+                wp_localize_script(
+                    'intellisend-routing-js',
+                    'intellisendData',
+                    array(
+                        'ajax_url' => admin_url('admin-ajax.php'),
+                        'nonce' => wp_create_nonce('intellisend_routing_nonce'),
+                        'strings' => array(
+                            'unconfiguredProvider' => __('The provider "%s" is not configured. Please select a configured provider or configure this provider in the SMTP Providers section.', 'intellisend'),
+                            'confirmDelete' => __('Are you sure you want to delete this routing rule? This action cannot be undone.', 'intellisend'),
+                            'noConfiguredProviders' => __('No configured SMTP providers found. Please configure at least one provider before adding routing rules.', 'intellisend')
+                        )
+                    )
                 );
             } elseif ($hook === 'intellisend_page_intellisend-reports') {
                 wp_enqueue_style(
@@ -251,6 +266,21 @@ class IntelliSend_Admin
                     array('jquery'),
                     INTELLISEND_VERSION,
                     false
+                );
+                
+                // Localize script with reports-specific data
+                wp_localize_script(
+                    'intellisend-reports-script',
+                    'intellisendData',
+                    array(
+                        'ajax_url' => admin_url('admin-ajax.php'),
+                        'nonce' => wp_create_nonce('intellisend_ajax_nonce'),
+                        'strings' => array(
+                            'confirmDelete' => __('Are you sure you want to delete the selected reports? This action cannot be undone.', 'intellisend'),
+                            'confirmDeleteAll' => __('Are you sure you want to delete ALL reports? This action cannot be undone.', 'intellisend'),
+                            'noReportsSelected' => __('Please select at least one report to delete.', 'intellisend')
+                        )
+                    )
                 );
             }
         }

@@ -1,7 +1,8 @@
 /**
- * IntelliSend Providers Page JavaScript
+ * IntelliSend Providers Page JavaScript - Updated
  * 
- * Handles functionality for the email providers management page.
+ * Handles functionality for the email providers management page with improved UX.
+ * Uses provider data from the database instead of hardcoded values.
  */
 
 (function($) {
@@ -16,19 +17,21 @@
             this.providerSelector = $('#provider-selector');
             this.providerForm = $('#provider-form');
             this.providerIdField = $('#provider-id');
-            this.otherProviderFields = $('#other-provider-fields');
             this.providerServerField = $('#provider-server');
             this.providerPortField = $('#provider-port');
             this.providerUsernameField = $('#provider-username');
             this.providerPasswordField = $('#provider-password');
+            this.providerSenderField = $('#provider-sender');
             this.isDefaultField = $('#is-default');
             
             this.setupEventListeners();
             this.setupPasswordToggle();
+            this.setupAutoPopulateSender();
+            this.setupTooltips();
             this.handleInitialProvider();
-            this.injectCustomStyles();
+            this.injectDynamicStyles();
             
-            // Start with initial UI state
+            // Update UI state based on initial provider
             this.updateUIState();
         },
 
@@ -53,6 +56,11 @@
             $('#reset-provider-btn').on('click', function() {
                 self.resetForm();
             });
+            
+            // Dismiss notification
+            $(document).on('click', '.intellisend-notice', function() {
+                $(this).fadeOut(300);
+            });
         },
         
         /**
@@ -75,6 +83,49 @@
         },
         
         /**
+         * Auto-populate sender email based on username
+         */
+        setupAutoPopulateSender: function() {
+            const self = this;
+            
+            this.providerUsernameField.on('input', function() {
+                // Only auto-populate if sender field is empty
+                if (self.providerSenderField.val() === '') {
+                    self.providerSenderField.val($(this).val());
+                }
+            });
+        },
+        
+        /**
+         * Setup tooltips for form labels
+         */
+        setupTooltips: function() {
+            // Create tooltip container if it doesn't exist
+            if ($('#tooltip-container').length === 0) {
+                $('body').append('<div id="tooltip-container"></div>');
+            }
+            
+            // Handle tooltip display on hover
+            $(document).on('mouseenter', 'label[data-tooltip]', function() {
+                const tooltip = $(this).data('tooltip');
+                const $container = $('#tooltip-container');
+                
+                $container.text(tooltip);
+                
+                // Position tooltip near the label
+                const offset = $(this).offset();
+                $container.css({
+                    top: offset.top - $container.outerHeight() - 5,
+                    left: offset.left + ($(this).outerWidth() / 2) - ($container.outerWidth() / 2)
+                }).addClass('visible');
+            });
+            
+            $(document).on('mouseleave', 'label[data-tooltip]', function() {
+                $('#tooltip-container').removeClass('visible');
+            });
+        },
+        
+        /**
          * Handle initial provider selection
          */
         handleInitialProvider: function() {
@@ -82,6 +133,7 @@
             const initialProvider = this.providerSelector.val();
             if (initialProvider) {
                 this.loadProviderData(initialProvider);
+                this.updateProviderDescription(this.providerSelector.find('option:selected'));
             }
         },
         
@@ -94,10 +146,31 @@
             // Load selected provider data
             if (selectedProvider) {
                 this.loadProviderData(selectedProvider);
+                this.updateProviderDescription(this.providerSelector.find('option:selected'));
             }
             
             // Update UI state
             this.updateUIState();
+        },
+        
+        /**
+         * Update provider description in the info box using data from the option
+         */
+        updateProviderDescription: function($option) {
+            const description = $option.data('description') || '';
+            const helpLink = $option.data('help-link') || '';
+            
+            // Update with fade effect
+            $('#provider-description').fadeOut(200, function() {
+                let html = description;
+                
+                // Add help link if available
+                if (helpLink) {
+                    html += ` <a href="${helpLink}" target="_blank" class="help-link">Learn More <span class="dashicons dashicons-external"></span></a>`;
+                }
+                
+                $(this).html(html).fadeIn(200);
+            });
         },
         
         /**
@@ -116,9 +189,10 @@
             // Set sender field - use sender if available, otherwise use username
             const sender = $selectedOption.data('sender');
             const username = $selectedOption.data('username') || '';
-            $('#provider-sender').val(sender || username);
+            this.providerSenderField.val(sender || username);
             
-            this.providerPasswordField.val(''); // Always clear password for security
+            // Always clear password for security
+            this.providerPasswordField.val('');
         },
         
         /**
@@ -134,7 +208,8 @@
             const $saveButton = $('#save-provider-btn');
             
             // Set loading state
-            this.setButtonLoading($saveButton, 'Saving...');
+            $saveButton.prop('disabled', true).addClass('loading');
+            $saveButton.data('original-text', $saveButton.text()).text('Saving...');
             
             // Get form data
             const formData = {
@@ -145,9 +220,16 @@
                 provider_server: this.providerServerField.val(),
                 provider_port: this.providerPortField.val(),
                 provider_username: this.providerUsernameField.val(),
-                provider_password: this.providerPasswordField.val(),
+                provider_sender: this.providerSenderField.val(),
                 is_default: this.isDefaultField.val()
             };
+            
+            // Only include password if it's not empty
+            // This prevents clearing saved passwords when nothing is entered
+            const password = this.providerPasswordField.val().trim();
+            if (password) {
+                formData.provider_password = password;
+            }
             
             // Send AJAX request
             $.ajax({
@@ -156,57 +238,57 @@
                 data: formData,
                 success: function(response) {
                     if (response.success) {
-                        // Update UI
-                        self.updateProviderSelector(formData);
-                        
-                        // Show success message
+                        // Update UI and show success message
                         self.showNotification('success', response.data.message);
+                        
+                        // Update the option attributes with new data
+                        const $option = self.providerSelector.find('option[value="' + formData.provider_name + '"]');
+                        $option.data('username', formData.provider_username);
+                        $option.data('sender', formData.provider_sender);
+                        $option.data('server', formData.provider_server);
+                        $option.data('port', formData.provider_port);
                     } else {
                         // Show error message
-                        self.showNotification('error', response.data.message);
+                        self.showNotification('error', response.data.message || 'Failed to save provider');
                     }
                 },
                 error: function() {
-                    self.showNotification('error', 'An error occurred while saving the provider.');
+                    self.showNotification('error', 'A network error occurred');
                 },
                 complete: function() {
-                    self.resetButtonLoading($saveButton, 'Save Provider');
+                    // Reset button state
+                    $saveButton.prop('disabled', false).removeClass('loading');
+                    $saveButton.text($saveButton.data('original-text'));
                 }
             });
-        },
-        
-        /**
-         * Update provider selector option with new data
-         */
-        updateProviderSelector: function(formData) {
-            const $option = this.providerSelector.find('option[value="' + formData.provider_name + '"]');
-            
-            // Update option data attributes
-            $option.data('id', formData.provider_id);
-            $option.data('server', formData.provider_server);
-            $option.data('port', formData.provider_port);
-            $option.data('username', formData.provider_username);
         },
         
         /**
          * Reset form to current provider data
          */
         resetForm: function() {
+            // Get current provider
             const currentProvider = this.providerSelector.val();
+            
+            // Load provider data
             this.loadProviderData(currentProvider);
-            this.clearValidationErrors();
+            
+            // Show brief notification
+            this.showNotification('info', 'Form reset to saved values');
         },
         
         /**
          * Validate form before submission
          */
         validateForm: function() {
-            this.clearValidationErrors();
+            // Remove any previous error messages
+            $('.field-error').remove();
+            $('.has-error').removeClass('has-error');
             
             let isValid = true;
             
-            // Validate server
-            if (!this.providerServerField.val().trim()) {
+            // Validate server for "other" provider
+            if (this.providerSelector.val() === 'other' && !this.providerServerField.val().trim()) {
                 this.showFieldError(this.providerServerField, 'SMTP Server is required');
                 isValid = false;
             }
@@ -217,17 +299,14 @@
                 isValid = false;
             }
             
-            // Validate password if provider ID is empty (new provider) or password is provided
+            // Validate password if provider ID is empty (new provider)
             const providerId = this.providerIdField.val();
             const password = this.providerPasswordField.val().trim();
             
+            // Only require password for new providers (when ID is empty)
             if (!providerId && !password) {
-                this.showFieldError(this.providerPasswordField, 'Password is required');
+                this.showFieldError(this.providerPasswordField, 'Password is required for new providers');
                 isValid = false;
-            }
-            
-            if (!isValid) {
-                this.providerForm.find('.has-error').first().focus();
             }
             
             return isValid;
@@ -242,54 +321,28 @@
         },
         
         /**
-         * Clear all validation errors
-         */
-        clearValidationErrors: function() {
-            $('.has-error').removeClass('has-error');
-            $('.field-error').remove();
-        },
-        
-        /**
          * Show notification
          */
         showNotification: function(type, message) {
             // Remove any existing notifications
-            $('.intellisend-notice').remove();
+            $('.intellisend-notification').remove();
             
-            const icon = type === 'success' ? 'dashicons-yes-alt' : 'dashicons-warning';
-            const noticeHtml = `
-                <div class="intellisend-notice ${type}">
-                    <span class="intellisend-notice-icon dashicons ${icon}"></span>
-                    <div class="intellisend-notice-content">${message}</div>
-                </div>
-            `;
+            const notification = $('<div class="intellisend-notification ' + type + '">' + message + '</div>');
             
-            this.providerForm.before(noticeHtml);
+            $('body').append(notification);
             
-            // Auto dismiss after 5 seconds
+            // Show notification
             setTimeout(function() {
-                $('.intellisend-notice').fadeOut(300, function() {
-                    $(this).remove();
-                });
+                notification.addClass('show');
+            }, 10);
+            
+            // Auto-dismiss after 3 seconds
+            setTimeout(function() {
+                notification.removeClass('show');
+                setTimeout(function() {
+                    notification.remove();
+                }, 300);
             }, 3000);
-        },
-        
-        /**
-         * Set button to loading state
-         */
-        setButtonLoading: function($button, loadingText) {
-            $button.prop('disabled', true).addClass('is-loading');
-            $button.data('original-text', $button.text()).text(loadingText);
-            $button.append('<span class="loading-spinner"></span>');
-        },
-        
-        /**
-         * Reset button from loading state
-         */
-        resetButtonLoading: function($button, originalText) {
-            $button.prop('disabled', false).removeClass('is-loading');
-            $button.find('.loading-spinner').remove();
-            $button.text(originalText);
         },
         
         /**
@@ -300,59 +353,134 @@
             
             // Show SMTP server and port fields only if provider is "other"
             if (selectedProvider && selectedProvider.toLowerCase() === 'other') {
-                $('.smtp-field').show();
+                $('.smtp-field').slideDown(300);
             } else {
-                $('.smtp-field').hide();
+                $('.smtp-field').slideUp(300);
             }
         },
         
         /**
-         * Inject custom styles for dynamic elements
+         * Inject dynamic styles
          */
-        injectCustomStyles: function() {
-            const customStyles = `
-                /* Field focus effects */
-                .provider-field input:focus + label,
-                .provider-field select:focus + label {
+        injectDynamicStyles: function() {
+            const styles = `
+                /* Tooltips */
+                #tooltip-container {
+                    position: absolute;
+                    background: #23282d;
+                    color: #fff;
+                    padding: 6px 10px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    max-width: 250px;
+                    z-index: 999999;
+                    opacity: 0;
+                    transition: opacity 0.2s ease;
+                    pointer-events: none;
+                }
+                
+                #tooltip-container.visible {
+                    opacity: 0.9;
+                }
+                
+                #tooltip-container:after {
+                    content: '';
+                    position: absolute;
+                    bottom: -5px;
+                    left: 50%;
+                    margin-left: -5px;
+                    border-width: 5px 5px 0;
+                    border-style: solid;
+                    border-color: #23282d transparent;
+                }
+                
+                /* Help Link */
+                .help-link {
+                    display: inline-block;
+                    margin-left: 8px;
                     color: #2271b1;
+                    text-decoration: none;
+                    font-size: 12px;
+                    font-weight: 500;
+                    vertical-align: middle;
                 }
                 
-                /* Loading overlay */
-                .providers-loading-overlay {
+                .help-link:hover {
+                    text-decoration: underline;
+                    color: #135e96;
+                }
+                
+                .help-link .dashicons {
+                    font-size: 14px;
+                    width: 14px;
+                    height: 14px;
+                    vertical-align: text-bottom;
+                }
+                
+                /* Notifications */
+                .intellisend-notification {
                     position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(255, 255, 255, 0.7);
+                    bottom: 20px;
+                    right: 20px;
+                    padding: 10px 15px;
+                    border-radius: 4px;
+                    background: #fff;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                    transform: translateX(120%);
+                    transition: transform 0.3s ease;
                     z-index: 99999;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
+                    font-size: 14px;
                 }
                 
-                /* Fade effects */
-                .fade-enter {
-                    opacity: 0;
-                    transition: opacity 0.3s ease;
+                .intellisend-notification.show {
+                    transform: translateX(0);
                 }
                 
-                .fade-enter-active {
-                    opacity: 1;
+                .intellisend-notification.success {
+                    border-left: 4px solid #46b450;
                 }
                 
-                .fade-exit {
-                    opacity: 1;
-                    transition: opacity 0.3s ease;
+                .intellisend-notification.error {
+                    border-left: 4px solid #dc3232;
                 }
                 
-                .fade-exit-active {
-                    opacity: 0;
+                .intellisend-notification.info {
+                    border-left: 4px solid #00a0d2;
+                }
+                
+                /* Field errors */
+                .has-error {
+                    border-color: #dc3232 !important;
+                }
+                
+                .field-error {
+                    color: #dc3232;
+                    font-size: 12px;
+                    display: block;
+                    margin-top: 5px;
+                }
+                
+                /* Loading state */
+                .loading:after {
+                    content: '';
+                    display: inline-block;
+                    width: 12px;
+                    height: 12px;
+                    margin-left: 8px;
+                    border: 2px solid rgba(255,255,255,0.3);
+                    border-radius: 50%;
+                    border-top-color: #fff;
+                    animation: spin 0.8s linear infinite;
+                    vertical-align: middle;
+                }
+                
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
                 }
             `;
             
-            $('<style id="intellisend-providers-dynamic-styles"></style>')
-                .text(customStyles)
+            $('<style id="intellisend-dynamic-styles"></style>')
+                .text(styles)
                 .appendTo('head');
         }
     };

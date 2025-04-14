@@ -740,5 +740,3 @@ class IntelliSend_Ajax {
     }
 }
 
-// Don't initialize directly - this will be called from the admin class
-// IntelliSend_Ajax::init();

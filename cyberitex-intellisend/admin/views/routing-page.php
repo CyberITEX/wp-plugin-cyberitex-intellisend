@@ -285,20 +285,6 @@ function intellisend_render_routing_page_content() {
     </div>
     
     <?php
-    // Localize script data
-    wp_localize_script(
-        'intellisend-routing-js',
-        'intellisendData',
-        array(
-            'nonce' => wp_create_nonce( 'intellisend_routing_nonce' ),
-            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-            'strings' => array(
-                'unconfiguredProvider' => __( 'The provider "%s" is not configured. Please select a configured provider or configure this provider in the SMTP Providers section.', 'intellisend' ),
-                'confirmDelete' => __( 'Are you sure you want to delete this routing rule? This action cannot be undone.', 'intellisend' ),
-                'noConfiguredProviders' => __( 'No configured SMTP providers found. Please configure at least one provider before adding routing rules.', 'intellisend' )
-            )
-        )
-    );
 }
 
 // Enqueue styles and scripts
@@ -306,6 +292,21 @@ function intellisend_enqueue_routing_assets() {
     if ( isset( $_GET['page'] ) && $_GET['page'] === 'intellisend-routing' ) {
         wp_enqueue_style( 'intellisend-routing-css', INTELLISEND_PLUGIN_URL . 'admin/css/routing-page.css', array(), INTELLISEND_VERSION );
         wp_enqueue_script( 'intellisend-routing-js', INTELLISEND_PLUGIN_URL . 'admin/js/routing-page.js', array( 'jquery' ), INTELLISEND_VERSION, true );
+        
+        // Localize script data
+        wp_localize_script(
+            'intellisend-routing-js',
+            'intellisendData',
+            array(
+                'nonce' => wp_create_nonce( 'intellisend_routing_nonce' ),
+                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'strings' => array(
+                    'unconfiguredProvider' => __( 'The provider "%s" is not configured. Please select a configured provider or configure this provider in the SMTP Providers section.', 'intellisend' ),
+                    'confirmDelete' => __( 'Are you sure you want to delete this routing rule? This action cannot be undone.', 'intellisend' ),
+                    'noConfiguredProviders' => __( 'No configured SMTP providers found. Please configure at least one provider before adding routing rules.', 'intellisend' )
+                )
+            )
+        );
     }
 }
 add_action( 'admin_enqueue_scripts', 'intellisend_enqueue_routing_assets' );

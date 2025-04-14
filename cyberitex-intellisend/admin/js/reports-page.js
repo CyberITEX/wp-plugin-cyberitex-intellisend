@@ -275,28 +275,14 @@
             const $deleteButton = $('#bulk-action-apply');
             self.setButtonLoading($deleteButton, 'Deleting...');
             
-            // Determine which nonce to use with proper fallbacks
-            let nonceToUse = '';
-            if (typeof intellisendData !== 'undefined' && intellisendData.nonce) {
-                nonceToUse = intellisendData.nonce;
-            } else if (typeof intellisend_ajax !== 'undefined' && intellisend_ajax.nonce) {
-                nonceToUse = intellisend_ajax.nonce;
-            } else {
-                nonceToUse = 'ee86b922eb'; // Legacy fallback
-            }
-            
-            // Determine AJAX URL
-            const ajaxUrlToUse = typeof intellisendData !== 'undefined' && intellisendData.ajaxurl ? 
-                intellisendData.ajaxurl : (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
-            
             // Send AJAX request
             $.ajax({
-                url: ajaxUrlToUse,
+                url: ajaxurl,
                 type: 'POST',
                 data: {
                     action: 'intellisend_delete_reports',
                     ids: reportIds,
-                    nonce: nonceToUse
+                    nonce: intellisendData.nonce
                 },
                 success: function(response) {
                     self.resetButtonLoading($deleteButton);
@@ -328,27 +314,13 @@
             const $deleteButton = $('#delete-all-reports');
             self.setButtonLoading($deleteButton, 'Deleting...');
             
-            // Determine which nonce to use with proper fallbacks
-            let nonceToUse = '';
-            if (typeof intellisendData !== 'undefined' && intellisendData.nonce) {
-                nonceToUse = intellisendData.nonce;
-            } else if (typeof intellisend_ajax !== 'undefined' && intellisend_ajax.nonce) {
-                nonceToUse = intellisend_ajax.nonce;
-            } else {
-                nonceToUse = 'ee86b922eb'; // Legacy fallback
-            }
-            
-            // Determine AJAX URL
-            const ajaxUrlToUse = typeof intellisendData !== 'undefined' && intellisendData.ajaxurl ? 
-                intellisendData.ajaxurl : (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
-            
             // Send AJAX request
             $.ajax({
-                url: ajaxUrlToUse,
+                url: ajaxurl,
                 type: 'POST',
                 data: {
                     action: 'intellisend_delete_all_reports',
-                    nonce: nonceToUse
+                    nonce: intellisendData.nonce
                 },
                 success: function(response) {
                     self.resetButtonLoading($deleteButton);
@@ -378,39 +350,18 @@
             
             console.log('Opening modal for report ID:', reportId);
             
-            // Fallback nonce for compatibility during transition
-            const legacyNonce = 'ee86b922eb';
-            
-            // Determine which nonce to use with proper fallbacks
-            let nonceToUse = '';
-            if (typeof intellisendData !== 'undefined' && intellisendData.nonce) {
-                nonceToUse = intellisendData.nonce;
-                console.log('Using nonce from intellisendData:', nonceToUse);
-            } else if (typeof intellisend_ajax !== 'undefined' && intellisend_ajax.nonce) {
-                nonceToUse = intellisend_ajax.nonce;
-                console.log('Using nonce from intellisend_ajax:', nonceToUse);
-            } else {
-                nonceToUse = legacyNonce;
-                console.log('Using fallback legacy nonce:', nonceToUse);
-            }
-            
-            // Determine AJAX URL
-            const ajaxUrlToUse = typeof intellisendData !== 'undefined' && intellisendData.ajaxurl ? 
-                intellisendData.ajaxurl : (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
-            console.log('Using AJAX URL:', ajaxUrlToUse);
-            
             // Show loading state in modal
             $('#view-report-modal').addClass('loading');
             $('#view-report-modal').show();
             
             // Get report data via AJAX
             $.ajax({
-                url: ajaxUrlToUse,
+                url: ajaxurl,
                 type: 'POST',
                 data: {
                     action: 'intellisend_get_report',
                     id: reportId,
-                    nonce: nonceToUse
+                    nonce: intellisendData.nonce
                 },
                 success: function(response) {
                     console.log('AJAX response:', response);
