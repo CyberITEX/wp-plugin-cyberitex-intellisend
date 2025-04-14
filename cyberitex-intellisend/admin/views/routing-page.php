@@ -8,7 +8,9 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-// Render the routing page
+/**
+ * Render the routing page content
+ */
 function intellisend_render_routing_page_content() {
     // Get all routing rules
     $routing_rules = IntelliSend_Database::get_routing_rules();
@@ -25,7 +27,7 @@ function intellisend_render_routing_page_content() {
                 <p><?php echo esc_html__( 'Configure rules to route emails through different SMTP providers based on recipient or subject patterns.', 'intellisend' ); ?></p>
                 
                 <div class="intellisend-routing-list">
-                    <table class="wp-list-table widefat fixed striped">
+                    <table class="intellisend-table">
                         <thead>
                             <tr>
                                 <th><?php echo esc_html__( 'Name', 'intellisend' ); ?></th>
@@ -70,23 +72,27 @@ function intellisend_render_routing_page_content() {
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <button class="button edit-rule" data-id="<?php echo esc_attr( $rule->id ); ?>">
-                                                <?php echo esc_html__( 'Edit', 'intellisend' ); ?>
-                                            </button>
-                                            <?php if ( $rule->priority != -1 ) : ?>
-                                                <button class="button delete-rule" data-id="<?php echo esc_attr( $rule->id ); ?>">
-                                                    <?php echo esc_html__( 'Delete', 'intellisend' ); ?>
+                                            <div class="action-buttons">
+                                                <button type="button" class="action-button edit-rule" data-id="<?php echo esc_attr( $rule->id ); ?>" title="<?php echo esc_attr__( 'Edit', 'intellisend' ); ?>">
+                                                    <span class="dashicons dashicons-edit"></span>
                                                 </button>
-                                            <?php endif; ?>
-                                            <?php if ( $rule->enabled ) : ?>
-                                                <button class="button deactivate-rule" data-id="<?php echo esc_attr( $rule->id ); ?>">
-                                                    <?php echo esc_html__( 'Deactivate', 'intellisend' ); ?>
-                                                </button>
-                                            <?php else : ?>
-                                                <button class="button activate-rule" data-id="<?php echo esc_attr( $rule->id ); ?>">
-                                                    <?php echo esc_html__( 'Activate', 'intellisend' ); ?>
-                                                </button>
-                                            <?php endif; ?>
+                                                
+                                                <?php if ( $rule->enabled ) : ?>
+                                                    <button type="button" class="action-button deactivate-rule" data-id="<?php echo esc_attr( $rule->id ); ?>" title="<?php echo esc_attr__( 'Deactivate', 'intellisend' ); ?>">
+                                                        <span class="dashicons dashicons-hidden"></span>
+                                                    </button>
+                                                <?php else : ?>
+                                                    <button type="button" class="action-button activate-rule" data-id="<?php echo esc_attr( $rule->id ); ?>" title="<?php echo esc_attr__( 'Activate', 'intellisend' ); ?>">
+                                                        <span class="dashicons dashicons-visibility"></span>
+                                                    </button>
+                                                <?php endif; ?>
+                                                
+                                                <?php if ( $rule->priority != -1 ) : ?>
+                                                    <button type="button" class="action-button delete-rule" data-id="<?php echo esc_attr( $rule->id ); ?>" data-name="<?php echo esc_attr( $rule->name ); ?>" title="<?php echo esc_attr__( 'Delete', 'intellisend' ); ?>">
+                                                        <span class="dashicons dashicons-trash"></span>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -95,64 +101,82 @@ function intellisend_render_routing_page_content() {
                     </table>
                 </div>
                 
-                <div class="intellisend-add-rule">
-                    <h3><?php echo esc_html__( 'Add New Rule', 'intellisend' ); ?></h3>
-                    <form id="add-rule-form">
-                        <div class="form-row">
-                            <label for="rule-name"><?php echo esc_html__( 'Name', 'intellisend' ); ?></label>
-                            <input type="text" id="rule-name" name="name" required>
+                <div class="add-rule-button">
+                    <button type="button" id="add-rule-btn" class="button button-primary">
+                        <span class="dashicons dashicons-plus-alt2"></span>
+                        <?php echo esc_html__( 'Add New Routing Rule', 'intellisend' ); ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Rule Modal -->
+    <div id="add-rule-modal" class="intellisend-modal">
+        <div class="intellisend-modal-content">
+            <div class="intellisend-modal-header">
+                <h3><?php echo esc_html__( 'Add New Routing Rule', 'intellisend' ); ?></h3>
+                <button type="button" class="intellisend-modal-close" aria-label="<?php echo esc_attr__( 'Close', 'intellisend' ); ?>">
+                    <span class="dashicons dashicons-no-alt"></span>
+                </button>
+            </div>
+            <div class="intellisend-modal-body">
+                <form id="add-rule-form" class="intellisend-form">
+                    <?php wp_nonce_field( 'intellisend_routing_nonce', 'intellisend_routing_nonce' ); ?>
+                    
+                    <div class="form-row">
+                        <div class="form-field required">
+                            <label for="rule-name"><?php echo esc_html__( 'Rule Name', 'intellisend' ); ?></label>
+                            <input type="text" id="rule-name" name="rule_name" placeholder="<?php echo esc_attr__( 'e.g. Marketing Emails', 'intellisend' ); ?>">
+                            <p class="description"><?php echo esc_html__( 'A descriptive name for this routing rule.', 'intellisend' ); ?></p>
                         </div>
-                        
-                        <div class="form-row">
-                            <label for="rule-pattern"><?php echo esc_html__( 'Subject Pattern', 'intellisend' ); ?></label>
-                            <input type="text" id="rule-pattern" name="subjectPatterns" required>
-                            <p class="description">
-                                <?php echo esc_html__( 'Use * as a wildcard. For example, *@example.com will match all emails to example.com.', 'intellisend' ); ?>
-                            </p>
-                        </div>
-                        
-                        <div class="form-row">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field required">
                             <label for="rule-provider"><?php echo esc_html__( 'Provider', 'intellisend' ); ?></label>
-                            <select id="rule-provider" name="defaultProviderName" required>
+                            <select id="rule-provider" name="rule_provider">
+                                <option value=""><?php echo esc_html__( 'Select Provider', 'intellisend' ); ?></option>
                                 <?php foreach ( $providers as $provider ) : ?>
-                                    <option value="<?php echo esc_attr( $provider->name ); ?>"><?php echo esc_html( $provider->name ); ?></option>
+                                    <option value="<?php echo esc_attr( $provider->name ); ?>">
+                                        <?php echo esc_html( $provider->name ); ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
+                            <p class="description"><?php echo esc_html__( 'The email provider to use for emails matching this rule.', 'intellisend' ); ?></p>
                         </div>
-                        
-                        <div class="form-row">
-                            <label for="rule-recipients"><?php echo esc_html__( 'Recipients', 'intellisend' ); ?></label>
-                            <input type="text" id="rule-recipients" name="recipients">
-                            <p class="description">
-                                <?php echo esc_html__( 'Optional. Comma-separated list of email addresses to send to. Leave empty to use the original recipients.', 'intellisend' ); ?>
-                            </p>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field required">
+                            <label for="rule-patterns"><?php echo esc_html__( 'Patterns', 'intellisend' ); ?></label>
+                            <textarea id="rule-patterns" name="rule_patterns" placeholder="<?php echo esc_attr__( 'e.g. *@example.com, newsletter*, *promo*', 'intellisend' ); ?>"></textarea>
+                            <p class="description"><?php echo esc_html__( 'Comma-separated list of patterns to match against email recipients or subjects. Use * as a wildcard.', 'intellisend' ); ?></p>
                         </div>
-                        
-                        <div class="form-row">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
                             <label for="rule-priority"><?php echo esc_html__( 'Priority', 'intellisend' ); ?></label>
-                            <input type="number" id="rule-priority" name="priority" value="10" required>
-                            <p class="description">
-                                <?php echo esc_html__( 'Higher number means higher priority. Rules are processed in order of priority.', 'intellisend' ); ?>
-                            </p>
+                            <input type="number" id="rule-priority" name="rule_priority" value="10" min="0" max="100">
+                            <p class="description"><?php echo esc_html__( 'Rules with lower numbers are processed first. Default rule has priority -1.', 'intellisend' ); ?></p>
                         </div>
                         
-                        <div class="form-row">
-                            <label for="rule-antispam"><?php echo esc_html__( 'Anti-Spam', 'intellisend' ); ?></label>
-                            <input type="checkbox" id="rule-antispam" name="antiSpamEnabled" value="1" checked>
-                            <span class="checkbox-label"><?php echo esc_html__( 'Enable anti-spam check for this rule', 'intellisend' ); ?></span>
-                        </div>
-                        
-                        <div class="form-row">
+                        <div class="form-field">
                             <label for="rule-enabled"><?php echo esc_html__( 'Status', 'intellisend' ); ?></label>
-                            <input type="checkbox" id="rule-enabled" name="enabled" value="1" checked>
-                            <span class="checkbox-label"><?php echo esc_html__( 'Enable this rule', 'intellisend' ); ?></span>
+                            <div class="checkbox-field">
+                                <input type="checkbox" id="rule-enabled" name="rule_enabled" value="1" checked>
+                                <label for="rule-enabled"><?php echo esc_html__( 'Active', 'intellisend' ); ?></label>
+                            </div>
+                            <p class="description"><?php echo esc_html__( 'Inactive rules will not be applied to emails.', 'intellisend' ); ?></p>
                         </div>
-                        
-                        <div class="form-row">
-                            <button type="submit" class="button button-primary"><?php echo esc_html__( 'Add Rule', 'intellisend' ); ?></button>
-                        </div>
-                    </form>
-                </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="button button-secondary cancel-form"><?php echo esc_html__( 'Cancel', 'intellisend' ); ?></button>
+                        <button type="submit" class="button button-primary"><?php echo esc_html__( 'Add Rule', 'intellisend' ); ?></button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -160,236 +184,93 @@ function intellisend_render_routing_page_content() {
     <!-- Edit Rule Modal -->
     <div id="edit-rule-modal" class="intellisend-modal">
         <div class="intellisend-modal-content">
-            <span class="intellisend-modal-close">&times;</span>
-            <h2><?php echo esc_html__( 'Edit Rule', 'intellisend' ); ?></h2>
-            
-            <form id="edit-rule-form">
-                <input type="hidden" id="edit-rule-id" name="id">
-                
-                <div class="form-row">
-                    <label for="edit-rule-name"><?php echo esc_html__( 'Name', 'intellisend' ); ?></label>
-                    <input type="text" id="edit-rule-name" name="name" required>
-                </div>
-                
-                <div class="form-row">
-                    <label for="edit-rule-pattern"><?php echo esc_html__( 'Subject Pattern', 'intellisend' ); ?></label>
-                    <input type="text" id="edit-rule-pattern" name="subjectPatterns" required>
-                    <p class="description">
-                        <?php echo esc_html__( 'Use * as a wildcard. For example, *@example.com will match all emails to example.com.', 'intellisend' ); ?>
-                    </p>
-                </div>
-                
-                <div class="form-row">
-                    <label for="edit-rule-provider"><?php echo esc_html__( 'Provider', 'intellisend' ); ?></label>
-                    <select id="edit-rule-provider" name="defaultProviderName" required>
-                        <?php foreach ( $providers as $provider ) : ?>
-                            <option value="<?php echo esc_attr( $provider->name ); ?>"><?php echo esc_html( $provider->name ); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                
-                <div class="form-row">
-                    <label for="edit-rule-recipients"><?php echo esc_html__( 'Recipients', 'intellisend' ); ?></label>
-                    <input type="text" id="edit-rule-recipients" name="recipients">
-                    <p class="description">
-                        <?php echo esc_html__( 'Optional. Comma-separated list of email addresses to send to. Leave empty to use the original recipients.', 'intellisend' ); ?>
-                    </p>
-                </div>
-                
-                <div class="form-row">
-                    <label for="edit-rule-priority"><?php echo esc_html__( 'Priority', 'intellisend' ); ?></label>
-                    <input type="number" id="edit-rule-priority" name="priority" required>
-                    <p class="description">
-                        <?php echo esc_html__( 'Higher number means higher priority. Rules are processed in order of priority.', 'intellisend' ); ?>
-                    </p>
-                </div>
-                
-                <div class="form-row">
-                    <label for="edit-rule-antispam"><?php echo esc_html__( 'Anti-Spam', 'intellisend' ); ?></label>
-                    <input type="checkbox" id="edit-rule-antispam" name="antiSpamEnabled" value="1">
-                    <span class="checkbox-label"><?php echo esc_html__( 'Enable anti-spam check for this rule', 'intellisend' ); ?></span>
-                </div>
-                
-                <div class="form-row">
-                    <label for="edit-rule-enabled"><?php echo esc_html__( 'Status', 'intellisend' ); ?></label>
-                    <input type="checkbox" id="edit-rule-enabled" name="enabled" value="1">
-                    <span class="checkbox-label"><?php echo esc_html__( 'Enable this rule', 'intellisend' ); ?></span>
-                </div>
-                
-                <div class="form-row">
-                    <button type="submit" class="button button-primary"><?php echo esc_html__( 'Update Rule', 'intellisend' ); ?></button>
-                </div>
-            </form>
+            <div class="intellisend-modal-header">
+                <h3><?php echo esc_html__( 'Edit Routing Rule', 'intellisend' ); ?></h3>
+                <button type="button" class="intellisend-modal-close" aria-label="<?php echo esc_attr__( 'Close', 'intellisend' ); ?>">
+                    <span class="dashicons dashicons-no-alt"></span>
+                </button>
+            </div>
+            <div class="intellisend-modal-body">
+                <form id="edit-rule-form" class="intellisend-form">
+                    <?php wp_nonce_field( 'intellisend_routing_nonce', 'intellisend_routing_nonce' ); ?>
+                    <input type="hidden" id="edit-rule-id" name="rule_id" value="">
+                    
+                    <div class="form-row">
+                        <div class="form-field required">
+                            <label for="edit-rule-name"><?php echo esc_html__( 'Rule Name', 'intellisend' ); ?></label>
+                            <input type="text" id="edit-rule-name" name="rule_name">
+                            <p class="description"><?php echo esc_html__( 'A descriptive name for this routing rule.', 'intellisend' ); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field required">
+                            <label for="edit-rule-provider"><?php echo esc_html__( 'Provider', 'intellisend' ); ?></label>
+                            <select id="edit-rule-provider" name="rule_provider">
+                                <option value=""><?php echo esc_html__( 'Select Provider', 'intellisend' ); ?></option>
+                                <?php foreach ( $providers as $provider ) : ?>
+                                    <option value="<?php echo esc_attr( $provider->name ); ?>">
+                                        <?php echo esc_html( $provider->name ); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description"><?php echo esc_html__( 'The email provider to use for emails matching this rule.', 'intellisend' ); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field required">
+                            <label for="edit-rule-patterns"><?php echo esc_html__( 'Patterns', 'intellisend' ); ?></label>
+                            <textarea id="edit-rule-patterns" name="rule_patterns"></textarea>
+                            <p class="description"><?php echo esc_html__( 'Comma-separated list of patterns to match against email recipients or subjects. Use * as a wildcard.', 'intellisend' ); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="edit-rule-priority"><?php echo esc_html__( 'Priority', 'intellisend' ); ?></label>
+                            <input type="number" id="edit-rule-priority" name="rule_priority" min="0" max="100">
+                            <p class="description"><?php echo esc_html__( 'Rules with lower numbers are processed first. Default rule has priority -1.', 'intellisend' ); ?></p>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label for="edit-rule-enabled"><?php echo esc_html__( 'Status', 'intellisend' ); ?></label>
+                            <div class="checkbox-field">
+                                <input type="checkbox" id="edit-rule-enabled" name="rule_enabled" value="1">
+                                <label for="edit-rule-enabled"><?php echo esc_html__( 'Active', 'intellisend' ); ?></label>
+                            </div>
+                            <p class="description"><?php echo esc_html__( 'Inactive rules will not be applied to emails.', 'intellisend' ); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="button button-secondary cancel-form"><?php echo esc_html__( 'Cancel', 'intellisend' ); ?></button>
+                        <button type="submit" class="button button-primary"><?php echo esc_html__( 'Update Rule', 'intellisend' ); ?></button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
     
-    <script>
-        jQuery(document).ready(function($) {
-            // Edit rule
-            $('.edit-rule').click(function() {
-                var ruleId = $(this).data('id');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'intellisend_get_routing_rule',
-                        id: ruleId,
-                        nonce: intellisendData.nonce
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            var rule = response.data;
-                            
-                            // Populate form fields
-                            $('#edit-rule-id').val(rule.id);
-                            $('#edit-rule-name').val(rule.name);
-                            $('#edit-rule-pattern').val(rule.subjectPatterns);
-                            $('#edit-rule-provider').val(rule.defaultProviderName);
-                            $('#edit-rule-recipients').val(rule.recipients);
-                            $('#edit-rule-priority').val(rule.priority);
-                            $('#edit-rule-antispam').prop('checked', rule.antiSpamEnabled == 1);
-                            $('#edit-rule-enabled').prop('checked', rule.enabled == 1);
-                            
-                            // Show the modal
-                            $('#edit-rule-modal').show();
-                        } else {
-                            alert(response.data);
-                        }
-                    }
-                });
-            });
-            
-            // Close modal
-            $('.intellisend-modal-close').click(function() {
-                $(this).closest('.intellisend-modal').hide();
-            });
-            
-            // Close modal when clicking outside
-            $(window).click(function(event) {
-                if ($(event.target).hasClass('intellisend-modal')) {
-                    $('.intellisend-modal').hide();
-                }
-            });
-            
-            // Add rule form submission
-            $('#add-rule-form').submit(function(e) {
-                e.preventDefault();
-                
-                var formData = $(this).serialize();
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'intellisend_add_routing_rule',
-                        formData: formData,
-                        nonce: intellisendData.nonce
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            location.reload();
-                        } else {
-                            alert(response.data);
-                        }
-                    }
-                });
-            });
-            
-            // Edit rule form submission
-            $('#edit-rule-form').submit(function(e) {
-                e.preventDefault();
-                
-                var formData = $(this).serialize();
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'intellisend_update_routing_rule',
-                        formData: formData,
-                        nonce: intellisendData.nonce
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            location.reload();
-                        } else {
-                            alert(response.data);
-                        }
-                    }
-                });
-            });
-            
-            // Delete rule
-            $('.delete-rule').click(function() {
-                if (confirm('Are you sure you want to delete this rule?')) {
-                    var ruleId = $(this).data('id');
-                    
-                    $.ajax({
-                        url: ajaxurl,
-                        type: 'POST',
-                        data: {
-                            action: 'intellisend_delete_routing_rule',
-                            id: ruleId,
-                            nonce: intellisendData.nonce
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                location.reload();
-                            } else {
-                                alert(response.data);
-                            }
-                        }
-                    });
-                }
-            });
-            
-            // Activate rule
-            $('.activate-rule').click(function() {
-                var ruleId = $(this).data('id');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'intellisend_activate_routing_rule',
-                        id: ruleId,
-                        nonce: intellisendData.nonce
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            location.reload();
-                        } else {
-                            alert(response.data);
-                        }
-                    }
-                });
-            });
-            
-            // Deactivate rule
-            $('.deactivate-rule').click(function() {
-                var ruleId = $(this).data('id');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'intellisend_deactivate_routing_rule',
-                        id: ruleId,
-                        nonce: intellisendData.nonce
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            location.reload();
-                        } else {
-                            alert(response.data);
-                        }
-                    }
-                });
-            });
-        });
-    </script>
     <?php
+    // Localize script data
+    wp_localize_script(
+        'intellisend-routing-js',
+        'intellisendData',
+        array(
+            'nonce' => wp_create_nonce( 'intellisend_routing_nonce' ),
+            'ajaxUrl' => admin_url( 'admin-ajax.php' )
+        )
+    );
 }
 
-intellisend_render_routing_page_content();
+// Enqueue styles and scripts
+function intellisend_enqueue_routing_assets() {
+    if ( isset( $_GET['page'] ) && $_GET['page'] === 'intellisend-routing' ) {
+        wp_enqueue_style( 'intellisend-routing-css', INTELLISEND_PLUGIN_URL . 'admin/css/routing-page.css', array(), INTELLISEND_VERSION );
+        wp_enqueue_script( 'intellisend-routing-js', INTELLISEND_PLUGIN_URL . 'admin/js/routing-page.js', array( 'jquery' ), INTELLISEND_VERSION, true );
+    }
+}
+add_action( 'admin_enqueue_scripts', 'intellisend_enqueue_routing_assets' );
+
+

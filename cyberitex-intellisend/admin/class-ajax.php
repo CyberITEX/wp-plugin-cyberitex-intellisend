@@ -13,6 +13,9 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
+// Include AJAX handlers
+require_once INTELLISEND_PLUGIN_DIR . 'admin/ajax/routing-handlers.php';
+
 /**
  * IntelliSend AJAX Class
  */
