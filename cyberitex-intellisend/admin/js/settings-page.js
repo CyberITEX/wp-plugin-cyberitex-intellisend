@@ -150,7 +150,8 @@
                     url: ajaxurl,
                     type: 'POST',
                     data: {
-                        action: 'intellisend_save_settings',
+                        action: 'intellisend_ajax_handler',
+                        sub_action: 'settings_saved',
                         formData: formData,
                         nonce: $('#intellisend_settings_nonce').val()
                     },
@@ -163,7 +164,8 @@
                             self.showNotification($form, 'success', 'Settings saved successfully.');
                         } else {
                             // Show error message
-                            self.showNotification($form, 'error', response.data || 'An error occurred while saving settings.');
+                            const errorMessage = response.data && response.data.message ? response.data.message : 'An error occurred while saving settings.';
+                            self.showNotification($form, 'error', errorMessage);
                         }
                     },
                     error: function() {
@@ -237,7 +239,8 @@
                     url: ajaxurl,
                     type: 'POST',
                     data: {
-                        action: 'intellisend_test_spam_detection',
+                        action: 'intellisend_ajax_handler',
+                        sub_action: 'spam_test_sent',
                         apiKey: apiKey,
                         endpoint: endpoint,
                         message: testMessage,
@@ -246,27 +249,15 @@
                     success: function(response) {
                         if (response.success) {
                             // Show result
-                            const resultHtml = self.createSpamTestResult(
-                                response.data.is_spam, 
-                                response.data.score
-                            );
-                            $messageField.after(resultHtml);
+                            self.createSpamTestResult(response.data.is_spam);
                         } else {
                             // Show error
-                            const errorHtml = self.createTestErrorResult(
-                                'Test failed', 
-                                response.data || 'An unknown error occurred'
-                            );
-                            $messageField.after(errorHtml);
+                            self.createTestErrorResult('Test failed', response.data.message || 'An unknown error occurred');
                         }
                     },
                     error: function() {
                         // Show network error
-                        const errorHtml = self.createTestErrorResult(
-                            'Test failed', 
-                            'A network error occurred. Please try again.'
-                        );
-                        $messageField.after(errorHtml);
+                        self.createTestErrorResult('Test failed', 'A network error occurred. Please try again.');
                     },
                     complete: function() {
                         // Reset button
@@ -279,39 +270,19 @@
         /**
          * Create spam test result HTML
          */
-        createSpamTestResult: function(isSpam, score) {
-            const resultClass = isSpam ? 'spam' : 'not-spam';
-            const resultIcon = isSpam ? 
-                '<span class="dashicons dashicons-warning"></span>' : 
-                '<span class="dashicons dashicons-yes-alt"></span>';
-            const resultMessage = isSpam ? 
-                'Message detected as SPAM' : 
-                'Message is NOT spam';
-            
-            return `
-                <div id="spam-test-result" class="test-result ${resultClass}">
-                    ${resultIcon}
-                    <div class="test-result-content">
-                        <strong>${resultMessage}</strong>
-                        <span class="test-score">Score: ${score}</span>
-                    </div>
-                </div>
-            `;
+        createSpamTestResult: function(isSpam) {
+            // Use the toast component
+            IntelliSendToast.spamResult(isSpam);
+            return '';
         },
         
         /**
          * Create test error result HTML
          */
         createTestErrorResult: function(title, message) {
-            return `
-                <div id="spam-test-result" class="test-result error">
-                    <span class="dashicons dashicons-no-alt"></span>
-                    <div class="test-result-content">
-                        <strong>${title}</strong>
-                        <span>${message}</span>
-                    </div>
-                </div>
-            `;
+            // Use the toast component
+            IntelliSendToast.error(message);
+            return '';
         },
         
         /**
@@ -361,33 +332,16 @@
                     },
                     success: function(response) {
                         if (response.success) {
-                            // Show success result
-                            const successHtml = `
-                                <div id="email-test-result" class="test-result not-spam">
-                                    <span class="dashicons dashicons-email-alt"></span>
-                                    <div class="test-result-content">
-                                        <strong>Test email sent successfully</strong>
-                                        <span>A test email has been sent to ${testRecipient}</span>
-                                    </div>
-                                </div>
-                            `;
-                            $emailField.after(successHtml);
+                            // Show success result using toast
+                            IntelliSendToast.success(`Test email sent successfully to ${testRecipient}`);
                         } else {
-                            // Show error result
-                            const errorHtml = self.createTestErrorResult(
-                                'Failed to send test email', 
-                                response.data || 'An unknown error occurred'
-                            );
-                            $emailField.after(errorHtml);
+                            // Show error result using toast
+                            IntelliSendToast.error(response.data.message || 'An unknown error occurred');
                         }
                     },
                     error: function() {
                         // Show network error
-                        const errorHtml = self.createTestErrorResult(
-                            'Failed to send test email', 
-                            'A network error occurred. Please try again.'
-                        );
-                        $emailField.after(errorHtml);
+                        IntelliSendToast.error('A network error occurred. Please try again.');
                     },
                     complete: function() {
                         // Reset button
@@ -650,12 +604,6 @@
                 .test-result.error .dashicons { color: #d63638; }
                 
                 .test-result-content { flex: 1; }
-                .test-score {
-                    display: block;
-                    margin-top: 4px;
-                    font-size: 13px;
-                    opacity: 0.8;
-                }
                 
                 /* Section toggle styles */
                 .intellisend-settings-section-title {
@@ -720,6 +668,46 @@
                     opacity: 1;
                     transform: translateY(0);
                 }
+                
+                /* Toast styles */
+                .intellisend-toast {
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    z-index: 9999;
+                    padding: 10px 20px;
+                    border-radius: 6px;
+                    background: #f8f9fa;
+                    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                    display: flex;
+                    align-items: center;
+                    transform: translateY(10px);
+                    opacity: 0;
+                    transition: transform 0.3s ease, opacity 0.3s ease;
+                }
+                .intellisend-toast.show {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+                .intellisend-toast.spam {
+                    background: #fcf0f1;
+                }
+                .intellisend-toast.not-spam {
+                    background: #f0f6e9;
+                }
+                .intellisend-toast.error {
+                    background: #fcf0f1;
+                }
+                
+                .intellisend-toast .dashicons {
+                    margin-right: 10px;
+                    font-size: 20px;
+                }
+                .intellisend-toast.spam .dashicons { color: #d63638; }
+                .intellisend-toast.not-spam .dashicons { color: #46b450; }
+                .intellisend-toast.error .dashicons { color: #d63638; }
+                
+                .intellisend-toast .toast-content { flex: 1; }
                 
                 /* Animations */
                 @keyframes spin {

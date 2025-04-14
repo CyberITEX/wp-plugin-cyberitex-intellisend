@@ -190,9 +190,17 @@ class IntelliSend_Admin
                 );
 
                 wp_enqueue_script(
+                    'intellisend-toast-script',
+                    INTELLISEND_PLUGIN_URL . 'admin/js/intellisend-toast.js',
+                    array('jquery'),
+                    INTELLISEND_VERSION,
+                    false
+                );
+
+                wp_enqueue_script(
                     'intellisend-settings-script',
                     INTELLISEND_PLUGIN_URL . 'admin/js/settings-page.js',
-                    array('jquery'),
+                    array('jquery', 'intellisend-toast-script'),
                     INTELLISEND_VERSION,
                     false
                 );

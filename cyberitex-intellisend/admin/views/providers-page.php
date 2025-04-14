@@ -25,7 +25,6 @@ function intellisend_render_providers_page_content() {
         ['value' => '25', 'label' => '25 (None)'],
         ['value' => '465', 'label' => '465 (SSL)'],
         ['value' => '587', 'label' => '587 (TLS)'],
-        ['value' => '2525', 'label' => '2525'],
     ];
     
     // Default port is 587
@@ -44,6 +43,7 @@ function intellisend_render_providers_page_content() {
                                     data-id="<?php echo esc_attr($provider->id); ?>"
                                     data-type="<?php echo esc_attr($provider->type); ?>"
                                     data-username="<?php echo esc_attr($provider->username); ?>"
+                                    data-sender="<?php echo esc_attr($provider->sender); ?>"
                                     data-server="<?php echo esc_attr($provider->server); ?>"
                                     data-port="<?php echo esc_attr($provider->port); ?>"
                                     <?php selected($settings->defaultProviderName, $provider->name); ?>>
@@ -95,6 +95,7 @@ function intellisend_render_providers_page_content() {
                             </div>
                         </div>
                         
+                        
                         <div class="provider-field-row">
                             <div class="provider-field">
                                 <label for="provider-password"><?php echo esc_html__('Password', 'intellisend'); ?></label>
@@ -105,6 +106,15 @@ function intellisend_render_providers_page_content() {
                                 <span class="field-description"><?php echo esc_html__('Your email provider password or app password.', 'intellisend'); ?></span>
                             </div>
                         </div>
+                        
+                        <div class="provider-field-row">
+                            <div class="provider-field">
+                                <label for="provider-sender"><?php echo esc_html__('Sender Email', 'intellisend'); ?></label>
+                                <input type="text" id="provider-sender" name="provider_sender" placeholder="sender@example.com">
+                                <span class="field-description"><?php echo esc_html__('The email address that will appear as the sender. Leave empty to use the username.', 'intellisend'); ?></span>
+                            </div>
+                        </div>
+                        
                     </div>
                 </div>
                 
@@ -117,5 +127,29 @@ function intellisend_render_providers_page_content() {
             </form>
         </div>
     </div>
+    <script>
+    jQuery(document).ready(function($) {
+        // Auto-populate sender field with username if empty
+        $('#provider-username').on('input', function() {
+            if ($('#provider-sender').val() === '') {
+                $('#provider-sender').val($(this).val());
+            }
+        });
+        
+        // When selecting a provider from the dropdown
+        $('#provider-selector').on('change', function() {
+            const selectedOption = $(this).find('option:selected');
+            const username = selectedOption.data('username');
+            const sender = selectedOption.data('sender');
+            
+            // If sender is empty, use username
+            if (!sender || sender === '') {
+                $('#provider-sender').val(username);
+            } else {
+                $('#provider-sender').val(sender);
+            }
+        });
+    });
+    </script>
     <?php
 }

@@ -87,6 +87,7 @@ function intellisend_ajax_add_routing_rule() {
     $rule->subjectPatterns = sanitize_textarea_field( $form_data['rule_patterns'] );
     $rule->priority = isset( $form_data['rule_priority'] ) ? intval( $form_data['rule_priority'] ) : 10;
     $rule->enabled = isset( $form_data['rule_enabled'] ) ? 1 : 0;
+    $rule->antiSpamEnabled = isset( $form_data['rule_antispam'] ) ? 1 : 0;
 
     // Add rule
     $result = IntelliSend_Database::add_routing_rule( $rule );
@@ -143,12 +144,13 @@ function intellisend_ajax_update_routing_rule() {
 
     // Prepare rule data
     $rule = new stdClass();
-    $rule->id = $rule_id;
+    $rule->id = intval( $form_data['rule_id'] );
     $rule->name = sanitize_text_field( $form_data['rule_name'] );
     $rule->defaultProviderName = sanitize_text_field( $form_data['rule_provider'] );
     $rule->subjectPatterns = sanitize_textarea_field( $form_data['rule_patterns'] );
     $rule->priority = isset( $form_data['rule_priority'] ) ? intval( $form_data['rule_priority'] ) : $existing_rule->priority;
     $rule->enabled = isset( $form_data['rule_enabled'] ) ? 1 : 0;
+    $rule->antiSpamEnabled = isset( $form_data['rule_antispam'] ) ? 1 : 0;
 
     // Update rule
     $result = IntelliSend_Database::update_routing_rule( $rule );

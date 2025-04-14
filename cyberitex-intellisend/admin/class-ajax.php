@@ -25,7 +25,14 @@ class IntelliSend_Ajax {
      * Initialize AJAX hooks
      */
     public static function init() {
+        // Main AJAX handler for all sub-actions
         add_action( 'wp_ajax_intellisend_ajax_handler', array( __CLASS__, 'ajax_handler' ) );
+        
+        // Direct action handlers
+        add_action( 'wp_ajax_intellisend_save_provider', array( __CLASS__, 'handle_save_provider' ) );
+        add_action( 'wp_ajax_intellisend_save_routing_rule', array( __CLASS__, 'handle_save_routing_rule' ) );
+        
+        // Enqueue scripts
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_scripts' ) );
     }
 
@@ -73,8 +80,8 @@ class IntelliSend_Ajax {
         }
 
         // Verify nonce
-        if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'intellisend_ajax_nonce' ) ) {
-            wp_send_json_error( array( 'message' => esc_html__( 'Security check failed.', 'intellisend-form' ) ) );
+        if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'intellisend_settings' ) ) {
+            wp_send_json_error( array( 'message' => esc_html__( 'Security check failed.', 'intellisend' ) ) );
             return;
         }
 
@@ -113,27 +120,34 @@ class IntelliSend_Ajax {
     private static function handle_save_settings() {
         // Verify user permissions
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => esc_html__( 'You do not have permission to perform this action.', 'intellisend-form' ) ) );
+            wp_send_json_error( array( 'message' => esc_html__( 'You do not have permission to perform this action.', 'intellisend' ) ) );
             return;
         }
 
+        // Parse the form data
+        $form_data = array();
+        parse_str($_POST['formData'], $form_data);
+        
+        // Get existing settings to preserve the spam test message
+        $existing_settings = IntelliSend_Database::get_settings();
+        
         // Process and save settings
         $settings = array(
-            'defaultProviderName'  => isset( $_POST['intellisend_smtp_provider'] ) ? sanitize_text_field( $_POST['intellisend_smtp_provider'] ) : '',
-            'antiSpamEndPoint'     => isset( $_POST['intellisend_api_endpoint'] ) ? esc_url_raw( $_POST['intellisend_api_endpoint'] ) : 'https://api.cyberitex.com/v1/spam-check',
-            'antiSpamApiKey'       => isset( $_POST['intellisend_api_key'] ) ? sanitize_text_field( $_POST['intellisend_api_key'] ) : '',
-            'testRecipient'        => isset( $_POST['intellisend_test_recipient'] ) ? sanitize_email( $_POST['intellisend_test_recipient'] ) : '',
-            'spamTestMessage'      => isset( $_POST['intellisend_spam_test_message'] ) ? sanitize_textarea_field( $_POST['intellisend_spam_test_message'] ) : '',
-            'logsRetentionDays'    => isset( $_POST['intellisend_logs_retention'] ) ? intval( $_POST['intellisend_logs_retention'] ) : 365,
+            'defaultProviderName'  => isset( $form_data['defaultProviderName'] ) ? sanitize_text_field( $form_data['defaultProviderName'] ) : '',
+            'antiSpamEndPoint'     => isset( $form_data['antiSpamEndPoint'] ) ? esc_url_raw( $form_data['antiSpamEndPoint'] ) : 'https://api.cyberitex.com/v1/tools/SpamCheck',
+            'antiSpamApiKey'       => isset( $form_data['antiSpamApiKey'] ) ? sanitize_text_field( $form_data['antiSpamApiKey'] ) : '',
+            'testRecipient'        => isset( $form_data['testRecipient'] ) ? sanitize_email( $form_data['testRecipient'] ) : '',
+            'spamTestMessage'      => $existing_settings->spamTestMessage, // Preserve the existing spam test message
+            'logsRetentionDays'    => isset( $form_data['logsRetentionDays'] ) ? intval( $form_data['logsRetentionDays'] ) : 365,
         );
 
         // Save settings to database
         $result = IntelliSend_Database::update_settings($settings);
 
         if ($result) {
-            wp_send_json_success( array( 'message' => esc_html__( 'Settings saved successfully!', 'intellisend-form' ) ) );
+            wp_send_json_success( array( 'message' => esc_html__( 'Settings saved successfully!', 'intellisend' ) ) );
         } else {
-            wp_send_json_error( array( 'message' => esc_html__( 'Failed to save settings.', 'intellisend-form' ) ) );
+            wp_send_json_error( array( 'message' => esc_html__( 'Failed to save settings.', 'intellisend' ) ) );
         }
     }
 
@@ -196,13 +210,21 @@ class IntelliSend_Ajax {
         $provider_id = isset( $_POST['provider_id'] ) ? sanitize_text_field( $_POST['provider_id'] ) : '';
         $provider = null;
         
+
         if (!empty($provider_id)) {
-            // Get the provider by name
+            // Get the provider by ID
             $provider = IntelliSend_Database::get_provider_by_name($provider_id);
+            // Log provider details
+            error_log('IntelliSend Test Email - Provider details: ' . ($provider ? json_encode(array(
+                'id' => $provider->id,
+                'name' => $provider->name,
+                'server' => $provider->server
+            )) : 'Provider not found'));
         } else {
             // Otherwise, get the default provider from settings
             $settings = IntelliSend_Database::get_settings();
             $default_provider_id = $settings->defaultProviderName;
+            error_log('IntelliSend Test Email - Default Provider ID: ' . $default_provider_id);
             $provider = IntelliSend_Database::get_provider_by_name($default_provider_id);
         }
         
@@ -244,7 +266,8 @@ class IntelliSend_Ajax {
             if ($provider->authRequired) {
                 $phpmailer->SMTPAuth = true;
                 $phpmailer->Username = $provider->username;
-                $phpmailer->Password = $provider->password;
+                // Decrypt the password before using it
+                $phpmailer->Password = IntelliSend_Database::decrypt_data($provider->password);
             } else {
                 $phpmailer->SMTPAuth = false;
             }
@@ -258,22 +281,40 @@ class IntelliSend_Ajax {
         // Capture debug output
         $debug_output = '';
         
+        // Set a flag to bypass the mail interception for test emails
+        $GLOBALS['intellisend_test_email'] = true;
+        
         // Send the test email
         $result = wp_mail( $to, $subject, $message, $headers );
         
-        // Create a log entry for the test email
-        $table_name = $wpdb->prefix . 'intellisend_logs';
+        // Reset the flag
+        $GLOBALS['intellisend_test_email'] = false;
+        
+        // Collect debug information
+        $error_details = "";
+        if (!$result) {
+            $error_details = "Email Error: " . ($debug_output ? $debug_output : 'Unknown error') . "\n\n";
+            $error_details .= "SMTP Settings:\n";
+            $error_details .= "Server: " . $provider->server . "\n";
+            $error_details .= "Port: " . $provider->port . "\n";
+            $error_details .= "Encryption: " . $provider->encryption . "\n";
+            $error_details .= "Username: " . $provider->username . "\n";
+            // Don't include the password for security reasons
+        }
+        
+        // Create a single log entry for the test email
+        $table_name = $wpdb->prefix . 'intellisend_reports';
         $log_data = array(
-            'log_type'    => 'test_email',
-            'log_status'  => $result ? 'success' : 'failed',
-            'log_message' => $result ? 'Test email sent successfully to ' . $test_email_address : 'Failed to send test email to ' . $test_email_address,
-            'log_date'    => current_time( 'mysql' ),
-            'log_ip'      => $_SERVER['REMOTE_ADDR'],
-            'log_details' => json_encode(array(
-                'provider' => $provider->name,
-                'recipient' => $test_email_address,
-                'debug_output' => $debug_output
-            ))
+            'date'        => current_time('mysql'),
+            'subject'     => $subject,
+            'sender'      => $provider->sender,
+            'recipients'  => $test_email_address,
+            'message'     => $message,
+            'status'      => $result ? 'sent' : 'failed',
+            'log'         => $result ? $debug_output : $debug_output . "\n" . $error_details,
+            'antiSpamEnabled' => 0,
+            'isSpam'      => 0,
+            'providerName' => $provider->name
         );
         $wpdb->insert( $table_name, $log_data );
         
@@ -283,227 +324,66 @@ class IntelliSend_Ajax {
                 'debug' => $debug_output // Include debug output even for successful sends
             ) );
         } else {
-            // Create a log entry for the failed test
-            $table_name = $wpdb->prefix . 'intellisend_logs';
-            
-            // Collect as much debug information as possible
-            $error_details = "Email Error: " . ($debug_output ? $debug_output : 'Unknown error') . "\n\n";
-            $error_details .= "SMTP Settings:\n";
-            $error_details .= "Server: " . $provider->server . "\n";
-            $error_details .= "Port: " . $provider->port . "\n";
-            $error_details .= "Encryption: " . $provider->encryption . "\n";
-            $error_details .= "Username: " . $provider->username . "\n";
-            // Don't include the password for security reasons
-            
-            $log_data = array(
-                'log_type'    => 'test_email',
-                'log_status'  => 'failed',
-                'log_message' => 'Test email failed: ' . ($debug_output ? $debug_output : 'Unknown error'),
-                'log_date'    => current_time( 'mysql' ),
-                'log_ip'      => $_SERVER['REMOTE_ADDR'],
-                'log_details' => json_encode(array(
-                    'error_type' => 'send_failure',
-                    'debug_output' => $debug_output,
-                    'recipient' => $test_email_address,
-                    'smtp_server' => $provider->server,
-                    'smtp_port' => $provider->port,
-                    'smtp_encryption' => $provider->encryption,
-                    'smtp_username' => $provider->username,
-                    'error_details' => $error_details
-                ))
-            );
-            $wpdb->insert( $table_name, $log_data );
-            
             wp_send_json_error( array(
-                'message' => esc_html__( 'Failed to send test email. Error: ', 'cyberitex-spam-interceptor' ) . ($debug_output ? $debug_output : 'Unknown error'),
-                'debug' => $error_details
+                'message' => esc_html__( 'Failed to send test email. Please check your SMTP settings.', 'cyberitex-spam-interceptor' ),
+                'debug' => $debug_output . "\n" . $error_details
             ) );
         }
     }
 
     /**
-     * Handle spam test email submission.
+     * Handle spam test submission.
      */
     private static function handle_spam_test() {
-        global $wpdb;
-        
         // Verify user permissions
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => esc_html__( 'You do not have permission to perform this action.', 'intellisend-form' ) ) );
+            wp_send_json_error( array( 'message' => esc_html__( 'You do not have permission to perform this action.', 'intellisend' ) ) );
             return;
         }
         
-        // Get the test email address and spam test message
-        $test_email_address = isset( $_POST['test_email'] ) ? sanitize_email( $_POST['test_email'] ) : '';
-        $spam_test_message = isset( $_POST['spam_test_message'] ) ? sanitize_textarea_field( $_POST['spam_test_message'] ) : '';
+        // Get the API key, endpoint and test message from the request
+        $api_key = isset( $_POST['apiKey'] ) ? sanitize_text_field( $_POST['apiKey'] ) : '';
+        $endpoint = isset( $_POST['endpoint'] ) ? esc_url_raw( $_POST['endpoint'] ) : '';
+        $message = isset( $_POST['message'] ) ? sanitize_textarea_field( $_POST['message'] ) : '';
         
-        // If no test email is provided, use the default recipient from settings
-        if (empty($test_email_address)) {
-            $settings = IntelliSend_Database::get_settings();
-            $test_email_address = $settings->testRecipient;
-        }
-
-        if (empty($test_email_address)) {
-            wp_send_json_error( array( 'message' => esc_html__( 'Please provide a valid email address for testing.', 'intellisend-form' ) ) );
+        if ( empty( $api_key ) ) {
+            wp_send_json_error( array( 'message' => esc_html__( 'API key is required.', 'intellisend' ) ) );
             return;
         }
         
-        // If no spam test message is provided, use the default from settings
-        if (empty($spam_test_message)) {
-            $settings = IntelliSend_Database::get_settings();
-            $spam_test_message = $settings->spamTestMessage;
-            
-            if (empty($spam_test_message)) {
-                $spam_test_message = "This is a test spam message. It contains common spam trigger words like: viagra, casino, free money, lottery winner, Nigerian prince, wire transfer, bank account details, etc.";
-            }
+        if ( empty( $endpoint ) ) {
+            wp_send_json_error( array( 'message' => esc_html__( 'Endpoint URL is required.', 'intellisend' ) ) );
+            return;
         }
         
-        // Check if the message is spam
-        $spam_checker = new IntelliSend_SpamCheck();
+        if ( empty( $message ) ) {
+            wp_send_json_error( array( 'message' => esc_html__( 'Test message is required.', 'intellisend' ) ) );
+            return;
+        }
+        
+        // Temporarily update settings for this test
         $settings = IntelliSend_Database::get_settings();
-        $spam_result = $spam_checker->check($spam_test_message, $settings->antiSpamApiKey);
+        $original_endpoint = $settings->antiSpamEndPoint;
+        $settings->antiSpamEndPoint = $endpoint;
         
-        // Get the provider ID from the request or use the default
-        $provider_id = isset( $_POST['provider_id'] ) ? sanitize_text_field( $_POST['provider_id'] ) : '';
-        $provider = null;
+        // Check if the message is spam using the provided API key
+        $spam_checker = new IntelliSend_SpamCheck();
+        $spam_result = $spam_checker->check($message, $api_key);
         
-        if (!empty($provider_id)) {
-            // Get the provider by name
-            $provider = IntelliSend_Database::get_provider_by_name($provider_id);
-        } else {
-            // Otherwise, get the default provider from settings
-            $settings = IntelliSend_Database::get_settings();
-            $default_provider_id = $settings->defaultProviderName;
-            $provider = IntelliSend_Database::get_provider_by_name($default_provider_id);
-        }
+        // Restore original endpoint setting
+        $settings->antiSpamEndPoint = $original_endpoint;
         
-        if (!$provider) {
-            wp_send_json_error( array( 'message' => esc_html__( 'SMTP provider not found. Please configure a provider first.', 'intellisend-form' ) ) );
-            return;
-        }
-        
-        // Set up the email
-        $to = $test_email_address;
-        $subject = 'IntelliSend Spam Test Email';
-        $message = $spam_test_message;
-        $headers = array(
-            'Content-Type: text/html; charset=UTF-8',
-            'From: IntelliSend <' . $test_email_address . '>',
-        );
-        
-        // Add spam score information to the message
-        $message .= '<hr><p><strong>Spam Test Results:</strong></p>';
-        if (isset($spam_result['success']) && $spam_result['success']) {
-            $message .= '<p>Spam Score: ' . $spam_result['score'] . '/10</p>';
-            $message .= '<p>Is Spam: ' . (($spam_result['score'] >= 7) ? 'Yes' : 'No') . '</p>';
-            if (isset($spam_result['details'])) {
-                $message .= '<p>Details: ' . $spam_result['details'] . '</p>';
-            }
-        } else {
-            $message .= '<p>Spam check failed. Please check your API key and try again.</p>';
-        }
-        
-        // Configure PHPMailer to use the selected SMTP provider
-        add_filter( 'wp_mail_from', function( $email ) use ( $test_email_address ) {
-            return $test_email_address;
-        });
-        
-        add_filter( 'wp_mail_from_name', function( $name ) {
-            return 'IntelliSend Spam Test';
-        });
-        
-        // Configure PHPMailer to use SMTP
-        add_action( 'phpmailer_init', function( $phpmailer ) use ( $provider ) {
-            $phpmailer->isSMTP();
-            $phpmailer->Host = $provider->server;
-            $phpmailer->Port = $provider->port;
-            
-            if ($provider->encryption === 'ssl') {
-                $phpmailer->SMTPSecure = 'ssl';
-            } elseif ($provider->encryption === 'tls') {
-                $phpmailer->SMTPSecure = 'tls';
-            }
-            
-            if ($provider->authRequired) {
-                $phpmailer->SMTPAuth = true;
-                $phpmailer->Username = $provider->username;
-                $phpmailer->Password = $provider->password;
-            } else {
-                $phpmailer->SMTPAuth = false;
-            }
-            
-            $phpmailer->SMTPDebug = 2;
-            $phpmailer->Debugoutput = function( $str, $level ) use ( &$debug_output ) {
-                $debug_output .= $str . "\n";
-            };
-        });
-        
-        // Capture debug output
-        $debug_output = '';
-        
-        // Send the test email
-        $result = wp_mail( $to, $subject, $message, $headers );
-        
-        // Create a log entry for the spam test email
-        $table_name = $wpdb->prefix . 'intellisend_logs';
-        $log_data = array(
-            'log_type'    => 'spam_test',
-            'log_status'  => $result ? 'success' : 'failed',
-            'log_message' => $result ? 'Spam test email sent successfully to ' . $test_email_address : 'Failed to send spam test email to ' . $test_email_address,
-            'log_date'    => current_time( 'mysql' ),
-            'log_ip'      => $_SERVER['REMOTE_ADDR'],
-            'log_details' => json_encode(array(
-                'provider' => $provider->name,
-                'recipient' => $test_email_address,
-                'spam_score' => isset($spam_result['score']) ? $spam_result['score'] : 'N/A',
-                'is_spam' => isset($spam_result['score']) && $spam_result['score'] >= 7 ? true : false,
-                'debug_output' => $debug_output
-            ))
-        );
-        $wpdb->insert( $table_name, $log_data );
-        
-        if ($result) {
+        if ( isset( $spam_result['success'] ) && $spam_result['success'] ) {
+            // Send success response with spam check results
             wp_send_json_success( array(
-                'message' => esc_html__( 'Spam test email sent successfully!', 'cyberitex-spam-interceptor' ),
-                'debug' => $debug_output // Include debug output even for successful sends
+                'is_spam' => isset($spam_result['isSpam']) ? $spam_result['isSpam'] : false,
+                'score' => isset($spam_result['score']) ? $spam_result['score'] : 0,
+                'message' => esc_html__( 'Spam check completed successfully.', 'intellisend' )
             ) );
         } else {
-            // Create a log entry for the failed spam test
-            $table_name = $wpdb->prefix . 'intellisend_logs';
-            
-            // Collect as much debug information as possible
-            $error_details = "Email Error: " . ($debug_output ? $debug_output : 'Unknown error') . "\n\n";
-            $error_details .= "SMTP Settings:\n";
-            $error_details .= "Server: " . $provider->server . "\n";
-            $error_details .= "Port: " . $provider->port . "\n";
-            $error_details .= "Encryption: " . $provider->encryption . "\n";
-            $error_details .= "Username: " . $provider->username . "\n";
-            // Don't include the password for security reasons
-            
-            $log_data = array(
-                'log_type'    => 'spam_test',
-                'log_status'  => 'failed',
-                'log_message' => 'Spam test email failed: ' . ($debug_output ? $debug_output : 'Unknown error'),
-                'log_date'    => current_time( 'mysql' ),
-                'log_ip'      => $_SERVER['REMOTE_ADDR'],
-                'log_details' => json_encode(array(
-                    'error_type' => 'send_failure',
-                    'debug_output' => $debug_output,
-                    'recipient' => $test_email_address,
-                    'smtp_server' => $provider->server,
-                    'smtp_port' => $provider->port,
-                    'smtp_encryption' => $provider->encryption,
-                    'smtp_username' => $provider->username,
-                    'message_length' => strlen($spam_test_message),
-                    'error_details' => $error_details
-                ))
-            );
-            $wpdb->insert( $table_name, $log_data );
-            
-            wp_send_json_error( array(
-                'message' => esc_html__( 'Failed to send spam test email. Error: ', 'cyberitex-spam-interceptor' ) . ($debug_output ? $debug_output : 'Unknown error'),
-                'debug' => $error_details
-            ) );
+            // Send error response
+            $error_message = isset($spam_result['message']) ? $spam_result['message'] : esc_html__( 'Spam check failed. Please check your API key and endpoint.', 'intellisend' );
+            wp_send_json_error( array( 'message' => $error_message ) );
         }
     }
 
@@ -548,6 +428,74 @@ class IntelliSend_Ajax {
             'providers' => $formatted_providers,
             'defaultProvider' => $default_provider
         ) );
+    }
+
+    /**
+     * Handle saving provider data
+     */
+    public static function handle_save_provider() {
+        // Check nonce
+        if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'intellisend_providers' ) ) {
+            wp_send_json_error( array( 'message' => esc_html__( 'Security check failed.', 'intellisend' ) ) );
+            return;
+        }
+
+        // Check user permissions
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => esc_html__( 'You do not have permission to perform this action.', 'intellisend' ) ) );
+            return;
+        }
+
+        // Validate required fields
+        if ( empty( $_POST['provider_name'] ) || empty( $_POST['provider_server'] ) || empty( $_POST['provider_port'] ) ) {
+            wp_send_json_error( array( 'message' => esc_html__( 'Please fill in all required fields.', 'intellisend' ) ) );
+            return;
+        }
+
+        // Prepare provider data
+        $provider_data = array(
+            'name'         => sanitize_text_field( $_POST['provider_name'] ),
+            'server'       => sanitize_text_field( $_POST['provider_server'] ),
+            'port'         => absint( $_POST['provider_port'] ),
+            'encryption'   => 'tls', // Default to TLS
+            'authRequired' => 1,     // Default to requiring authentication
+            'username'     => sanitize_text_field( $_POST['provider_username'] ),
+            'sender'       => !empty($_POST['provider_sender']) ? sanitize_text_field( $_POST['provider_sender'] ) : sanitize_text_field( $_POST['provider_username'] ), // Use username as default sender if not provided
+            'password'     => $_POST['provider_password'], // Will be encrypted by the database class
+            'configured'   => 1      // Mark as configured since all required fields are provided
+        );
+
+        // Get provider ID
+        $provider_id = isset( $_POST['provider_id'] ) && ! empty( $_POST['provider_id'] ) ? absint( $_POST['provider_id'] ) : 0;
+
+        // Check if this should be the default provider
+        $set_as_default = isset( $_POST['is_default'] ) && $_POST['is_default'] == '1';
+
+        // Save provider
+        if ( $provider_id > 0 ) {
+            // Update existing provider
+            $result = IntelliSend_Database::update_provider( $provider_id, $provider_data, $set_as_default );
+            $message = esc_html__( 'Provider updated successfully.', 'intellisend' );
+        } else {
+            // Add new provider
+            $result = IntelliSend_Database::add_provider( $provider_data );
+            if ( $result && $set_as_default ) {
+                // Set as default if requested
+                $settings = IntelliSend_Database::get_settings();
+                if ( $settings ) {
+                    $settings->defaultProviderName = $provider_data['name'];
+                    IntelliSend_Database::update_settings( $settings );
+                }
+            }
+            $message = esc_html__( 'Provider added successfully.', 'intellisend' );
+        }
+
+        // Return response
+        if ( $result ) {
+            wp_send_json_success( array( 'message' => $message ) );
+        } else {
+            wp_send_json_error( array( 'message' => esc_html__( 'An error occurred while saving the provider.', 'intellisend' ) ) );
+        }
     }
 }
 

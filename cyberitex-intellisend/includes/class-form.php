@@ -36,6 +36,11 @@ class IntelliSend_Form {
      * @return array Modified mail arguments.
      */
     public static function intercept_mail( $args ) {
+        // Skip processing for test emails
+        if (isset($GLOBALS['intellisend_test_email']) && $GLOBALS['intellisend_test_email'] === true) {
+            return $args;
+        }
+        
         // Get settings
         $settings = IntelliSend_Database::get_settings();
         
@@ -118,6 +123,7 @@ class IntelliSend_Form {
                 'antiSpamEnabled' => isset($rule->antiSpamEnabled) ? $rule->antiSpamEnabled : 0,
                 'isSpam' => $is_spam ? 1 : 0,
                 'routingRuleId' => $rule ? $rule->id : null,
+                'providerName' => $provider ? $provider->name : '',
             ) );
         }
         

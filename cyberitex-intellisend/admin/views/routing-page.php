@@ -182,6 +182,17 @@ function intellisend_render_routing_page_content() {
                         </div>
                     </div>
                     
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="rule-antispam"><?php echo esc_html__( 'Anti-Spam', 'intellisend' ); ?></label>
+                            <div class="checkbox-field">
+                                <input type="checkbox" id="rule-antispam" name="rule_antispam" value="1" checked>
+                                <label for="rule-antispam"><?php echo esc_html__( 'Enable anti-spam check', 'intellisend' ); ?></label>
+                            </div>
+                            <p class="description"><?php echo esc_html__( 'When enabled, emails matching this rule will be checked for spam before sending.', 'intellisend' ); ?></p>
+                        </div>
+                    </div>
+                    
                     <div class="form-actions">
                         <button type="button" class="button button-secondary cancel-form"><?php echo esc_html__( 'Cancel', 'intellisend' ); ?></button>
                         <button type="submit" class="button button-primary"><?php echo esc_html__( 'Add Rule', 'intellisend' ); ?></button>
@@ -250,6 +261,17 @@ function intellisend_render_routing_page_content() {
                                 <label for="edit-rule-enabled"><?php echo esc_html__( 'Active', 'intellisend' ); ?></label>
                             </div>
                             <p class="description"><?php echo esc_html__( 'Inactive rules will not be applied to emails.', 'intellisend' ); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="edit-rule-antispam"><?php echo esc_html__( 'Anti-Spam', 'intellisend' ); ?></label>
+                            <div class="checkbox-field">
+                                <input type="checkbox" id="edit-rule-antispam" name="rule_antispam" value="1">
+                                <label for="edit-rule-antispam"><?php echo esc_html__( 'Enable anti-spam check', 'intellisend' ); ?></label>
+                            </div>
+                            <p class="description"><?php echo esc_html__( 'When enabled, emails matching this rule will be checked for spam before sending.', 'intellisend' ); ?></p>
                         </div>
                     </div>
                     

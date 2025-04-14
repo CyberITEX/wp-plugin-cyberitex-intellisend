@@ -194,6 +194,7 @@
             $('#edit-rule-patterns').val(rule.subjectPatterns);
             $('#edit-rule-priority').val(rule.priority);
             $('#edit-rule-enabled').prop('checked', rule.enabled);
+            $('#edit-rule-antispam').prop('checked', rule.antiSpamEnabled);
             
             // Check if the provider is still configured
             if (!rule.providerConfigured) {

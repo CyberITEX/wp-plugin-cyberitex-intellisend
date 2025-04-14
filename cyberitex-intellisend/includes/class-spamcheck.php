@@ -36,12 +36,12 @@ final class IntelliSend_SpamCheck {
             return array(
                 'success' => false,
                 'message' => 'No API key provided',
-                'score'   => 0,
+                'isSpam'  => false,
             );
         }
         
         // Prepare the API request
-        $api_url = !empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/spam-check';
+        $api_url = !empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/tools/SpamCheck';
         
         $args = array(
             'method'  => 'POST',
@@ -63,7 +63,25 @@ final class IntelliSend_SpamCheck {
             return array(
                 'success' => false,
                 'message' => $response->get_error_message(),
-                'score'   => 0,
+                'isSpam'  => false,
+            );
+        }
+        
+        // Check for HTTP status code
+        $status_code = wp_remote_retrieve_response_code( $response );
+        if ( $status_code === 401 ) {
+            return array(
+                'success' => false,
+                'message' => 'Invalid API key. Please check your API key and try again.',
+                'isSpam'  => false,
+            );
+        }
+        
+        if ( $status_code !== 200 ) {
+            return array(
+                'success' => false,
+                'message' => 'API request failed with status code: ' . $status_code,
+                'isSpam'  => false,
             );
         }
         
@@ -71,19 +89,21 @@ final class IntelliSend_SpamCheck {
         $body = wp_remote_retrieve_body( $response );
         $data = json_decode( $body, true );
         
-        if ( ! is_array( $data ) || ! isset( $data['score'] ) ) {
+        // Check if the response is in the expected format
+        if ( ! is_array( $data ) || ! isset( $data['isSpam'] ) ) {
             return array(
                 'success' => false,
                 'message' => 'Invalid response from spam check API',
-                'score'   => 0,
+                'isSpam'  => false,
             );
         }
         
         // Return the spam check results
         return array(
             'success' => true,
-            'message' => isset( $data['message'] ) ? $data['message'] : '',
-            'score'   => floatval( $data['score'] ),
+            'message' => 'Spam check completed successfully',
+            'isSpam'  => (bool) $data['isSpam'],
+            'score'   => isset( $data['score'] ) ? floatval( $data['score'] ) : 0,
         );
     }
     
@@ -114,7 +134,7 @@ final class IntelliSend_SpamCheck {
         }
         
         // Prepare the API request
-        $api_url = !empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/validate-key';
+        $api_url = !empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/tools/SpamCheck';
         
         $args = array(
             'method'  => 'POST',

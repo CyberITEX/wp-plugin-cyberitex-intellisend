@@ -73,7 +73,7 @@ class IntelliSend_Database {
      * @param string $encrypted_data Encrypted data
      * @return string Decrypted data
      */
-    private static function decrypt_data($encrypted_data) {
+    public static function decrypt_data($encrypted_data) {
         if (empty($encrypted_data)) {
             return '';
         }
@@ -131,6 +131,7 @@ class IntelliSend_Database {
                 port int(11) NOT NULL,
                 encryption varchar(20) NOT NULL,
                 authRequired tinyint(1) DEFAULT 1,
+                sender varchar(255),
                 username varchar(255),
                 password varchar(255),
                 configured tinyint(1) DEFAULT 0,
@@ -252,7 +253,6 @@ class IntelliSend_Database {
             $count = $wpdb->get_var("SELECT COUNT(*) FROM $settings_table");
             if ($count == 0) {
                 $admin_email = function_exists('get_option') ? get_option('admin_email') : '';
-                $blog_name = function_exists('get_option') ? get_option('blogname') : 'WordPress Site';
                 
                 $wpdb->insert(
                     $settings_table,
@@ -316,6 +316,7 @@ class IntelliSend_Database {
                 antiSpamEnabled tinyint(1) DEFAULT 1,
                 isSpam tinyint(1) DEFAULT 0,
                 routingRuleId bigint(20),
+                providerName varchar(100),
                 PRIMARY KEY  (id),
                 KEY date (date),
                 KEY status (status),
@@ -432,19 +433,23 @@ class IntelliSend_Database {
             }
         }
         
+        // Encrypt password if provided
+        $password = !empty($data['password']) ? self::encrypt_data($data['password']) : '';
+        
         // Insert the provider
         $result = $wpdb->insert(
             $table,
             array(
                 'name' => sanitize_text_field($data['name']),
-                'description' => sanitize_text_field($data['description']),
-                'helpLink' => sanitize_text_field($data['helpLink']),
+                'description' => isset($data['description']) ? sanitize_text_field($data['description']) : '',
+                'helpLink' => isset($data['helpLink']) ? sanitize_text_field($data['helpLink']) : '',
                 'server' => sanitize_text_field($data['server']),
                 'port' => sanitize_text_field($data['port']),
-                'encryption' => sanitize_text_field($data['encryption']),
+                'encryption' => isset($data['encryption']) ? sanitize_text_field($data['encryption']) : 'tls',
                 'authRequired' => absint($data['authRequired']),
                 'username' => sanitize_text_field($data['username']),
-                'password' => sanitize_text_field($data['password']),
+                'sender' => isset($data['sender']) && !empty($data['sender']) ? sanitize_text_field($data['sender']) : sanitize_text_field($data['username']),
+                'password' => $password,
                 'configured' => $configured,
             )
         );
@@ -498,8 +503,15 @@ class IntelliSend_Database {
             $update_data['username'] = sanitize_text_field($data['username']);
         }
         
+        if (isset($data['sender'])) {
+            $update_data['sender'] = sanitize_text_field($data['sender']);
+        } else if (isset($data['username'])) {
+            // If sender is not provided but username is updated, use username as sender
+            $update_data['sender'] = sanitize_text_field($data['username']);
+        }
+        
         if (isset($data['password'])) {
-            $update_data['password'] = sanitize_text_field($data['password']);
+            $update_data['password'] = self::encrypt_data($data['password']);
         }
         
         // Set configured to true if server and port are provided
@@ -922,6 +934,7 @@ class IntelliSend_Database {
                 'antiSpamEnabled' => isset($data['antiSpamEnabled']) ? absint($data['antiSpamEnabled']) : 0,
                 'isSpam' => isset($data['isSpam']) ? absint($data['isSpam']) : 0,
                 'routingRuleId' => isset($data['routingRuleId']) ? absint($data['routingRuleId']) : null,
+                'providerName' => isset($data['providerName']) ? sanitize_text_field($data['providerName']) : '',
             )
         );
         
@@ -979,6 +992,10 @@ class IntelliSend_Database {
         
         if (isset($data['routingRuleId'])) {
             $update_data['routingRuleId'] = absint($data['routingRuleId']);
+        }
+        
+        if (isset($data['providerName'])) {
+            $update_data['providerName'] = sanitize_text_field($data['providerName']);
         }
         
         return $wpdb->update(

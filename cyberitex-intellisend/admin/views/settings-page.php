@@ -18,7 +18,7 @@ function intellisend_render_settings_page_content() {
     $z = IntelliSend_Database::get_settings();
     
     // Get providers
-    $providers = IntelliSend_Database::get_providers();
+    $providers = IntelliSend_Database::get_providers(array( 'configured' => 1 ));
     ?>
     <div class="wrap intellisend-settings-wrap">
         <h1><?php echo esc_html__('IntelliSend Settings', 'intellisend'); ?></h1>
@@ -70,8 +70,8 @@ function intellisend_render_settings_page_content() {
                     
                     <div class="intellisend-settings-row">
                         <div class="intellisend-settings-field">
-                            <label for="anti-spam-endpoint"><?php echo esc_html__('Anti-Spam API Endpoint', 'intellisend'); ?></label>
-                            <input type="url" name="antiSpamEndpoint" id="anti-spam-endpoint" value="<?php echo esc_attr($z->antiSpamEndpoint ?? ''); ?>" placeholder="https://api.example.com/spam-check">
+                            <label for="anti-spam-endpoint"><?php echo esc_html__('Endpoint', 'intellisend'); ?></label>
+                            <input type="url" name="antiSpamEndPoint" id="anti-spam-endpoint" value="<?php echo esc_attr($z->antiSpamEndPoint ?? ''); ?>" placeholder="https://api.example.com/spam-check">
                         </div>
                         
                         <div class="intellisend-settings-field">

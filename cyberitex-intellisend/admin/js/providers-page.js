@@ -112,6 +112,12 @@
             this.providerServerField.val($selectedOption.data('server') || '');
             this.providerPortField.val($selectedOption.data('port') || '587');
             this.providerUsernameField.val($selectedOption.data('username') || '');
+            
+            // Set sender field - use sender if available, otherwise use username
+            const sender = $selectedOption.data('sender');
+            const username = $selectedOption.data('username') || '';
+            $('#provider-sender').val(sender || username);
+            
             this.providerPasswordField.val(''); // Always clear password for security
         },
         
