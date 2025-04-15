@@ -131,18 +131,25 @@ class IntelliSend_Ajax {
         $form_data = array();
         parse_str($_POST['formData'], $form_data);
         
-        // Get existing settings to preserve the spam test message
+        // Get existing settings to preserve values that shouldn't be changed
         $existing_settings = IntelliSend_Database::get_settings();
         
         // Process and save settings
         $settings = array(
             'defaultProviderName'  => isset( $form_data['defaultProviderName'] ) ? sanitize_text_field( $form_data['defaultProviderName'] ) : '',
             'antiSpamEndPoint'     => isset( $form_data['antiSpamEndPoint'] ) ? esc_url_raw( $form_data['antiSpamEndPoint'] ) : 'https://api.cyberitex.com/v1/tools/SpamCheck',
-            'antiSpamApiKey'       => isset( $form_data['antiSpamApiKey'] ) ? sanitize_text_field( $form_data['antiSpamApiKey'] ) : '',
             'testRecipient'        => isset( $form_data['testRecipient'] ) ? sanitize_email( $form_data['testRecipient'] ) : '',
             'spamTestMessage'      => $existing_settings->spamTestMessage, // Preserve the existing spam test message
             'logsRetentionDays'    => isset( $form_data['logsRetentionDays'] ) ? intval( $form_data['logsRetentionDays'] ) : 365,
         );
+        
+        // Only update API key if a new one is provided
+        if ( isset( $form_data['antiSpamApiKey'] ) && !empty( $form_data['antiSpamApiKey'] ) ) {
+            $settings['antiSpamApiKey'] = sanitize_text_field( $form_data['antiSpamApiKey'] );
+        } else {
+            // Keep the existing API key
+            $settings['antiSpamApiKey'] = $existing_settings->antiSpamApiKey;
+        }
 
         // Save settings to database
         $result = IntelliSend_Database::update_settings($settings);
@@ -165,21 +172,68 @@ class IntelliSend_Ajax {
         }
 
         // Get the API key
-        $api_key = isset( $_POST['intellisend_api_key'] ) ? sanitize_text_field( $_POST['intellisend_api_key'] ) : '';
+        $api_key = isset( $_POST['api_key'] ) ? sanitize_text_field( $_POST['api_key'] ) : '';
+        $endpoint = isset( $_POST['endpoint'] ) ? esc_url_raw( $_POST['endpoint'] ) : '';
 
         if ( empty( $api_key ) ) {
             wp_send_json_error( array( 'message' => esc_html__( 'API key is required.', 'intellisend-form' ) ) );
             return;
         }
 
-        // TODO: Implement actual API key check logic here
-        // For now, just simulate a successful check
-        $api_check_result = true;
+        if ( empty( $endpoint ) ) {
+            wp_send_json_error( array( 'message' => esc_html__( 'API endpoint is required.', 'intellisend-form' ) ) );
+            return;
+        }
 
-        if ( $api_check_result ) {
-            wp_send_json_success( array( 'message' => esc_html__( 'API key is valid!', 'intellisend-form' ) ) );
+        // Perform actual API key validation by sending a request to the endpoint
+        $response = wp_remote_post( $endpoint, array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key
+            ),
+            'timeout' => 15,
+            'body' => json_encode(array(
+                'test' => true,
+                'message' => 'Test message for API validation'
+            ))
+        ) );
+
+        // Check for errors
+        if ( is_wp_error( $response ) ) {
+            wp_send_json_error( array( 
+                'message' => esc_html__( 'Connection error: ', 'intellisend-form' ) . $response->get_error_message(),
+                'details' => $response->get_error_messages()
+            ) );
+            return;
+        }
+
+        // Get response code
+        $response_code = wp_remote_retrieve_response_code( $response );
+        $response_body = wp_remote_retrieve_body( $response );
+        $response_headers = wp_remote_retrieve_headers( $response );
+        
+        // Debug information
+        $debug_info = array(
+            'code' => $response_code,
+            'body' => $response_body,
+            'headers' => $response_headers,
+        );
+
+        if ( $response_code === 200 ) {
+            wp_send_json_success( array( 
+                'message' => esc_html__( 'API key is valid!', 'intellisend-form' ),
+                'debug' => $debug_info
+            ) );
+        } else if ( $response_code === 401 ) {
+            wp_send_json_error( array( 
+                'message' => esc_html__( 'Invalid API key. Please check and try again.', 'intellisend-form' ),
+                'debug' => $debug_info
+            ) );
         } else {
-            wp_send_json_error( array( 'message' => esc_html__( 'Invalid API key. Please check and try again.', 'intellisend-form' ) ) );
+            wp_send_json_error( array( 
+                'message' => sprintf( esc_html__( 'Unexpected response from API server: %d', 'intellisend-form' ), $response_code ),
+                'debug' => $debug_info
+            ) );
         }
     }
 
@@ -353,9 +407,16 @@ class IntelliSend_Ajax {
         }
         
         // Get the API key, endpoint and test message from the request
-        $api_key = isset( $_POST['apiKey'] ) ? sanitize_text_field( $_POST['apiKey'] ) : '';
+        $api_key = isset( $_POST['api_key'] ) ? sanitize_text_field( $_POST['api_key'] ) : '';
         $endpoint = isset( $_POST['endpoint'] ) ? esc_url_raw( $_POST['endpoint'] ) : '';
         $message = isset( $_POST['message'] ) ? sanitize_textarea_field( $_POST['message'] ) : '';
+        $use_existing_key = isset( $_POST['use_existing_key'] ) && $_POST['use_existing_key'] == 1;
+        
+        // If using existing key and no new key provided, get it from the database
+        if ( $use_existing_key && empty( $api_key ) ) {
+            $settings = IntelliSend_Database::get_settings();
+            $api_key = $settings->antiSpamApiKey;
+        }
         
         if ( empty( $api_key ) ) {
             wp_send_json_error( array( 'message' => esc_html__( 'API key is required.', 'intellisend' ) ) );
@@ -387,7 +448,7 @@ class IntelliSend_Ajax {
         if ( isset( $spam_result['success'] ) && $spam_result['success'] ) {
             // Send success response with spam check results
             wp_send_json_success( array(
-                'is_spam' => isset($spam_result['isSpam']) ? $spam_result['isSpam'] : false,
+                'isSpam' => isset($spam_result['isSpam']) ? $spam_result['isSpam'] : false,
                 'score' => isset($spam_result['score']) ? $spam_result['score'] : 0,
                 'message' => esc_html__( 'Spam check completed successfully.', 'intellisend' )
             ) );
@@ -434,10 +495,6 @@ class IntelliSend_Ajax {
             return;
         }
         
-        if ($received_nonce === $known_legacy_nonce) {
-            error_log('IntelliSend: Using legacy nonce for backward compatibility');
-        }
-
         // Get report ID
         $report_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
         if (!$report_id) {
@@ -739,4 +796,3 @@ class IntelliSend_Ajax {
         ));
     }
 }
-

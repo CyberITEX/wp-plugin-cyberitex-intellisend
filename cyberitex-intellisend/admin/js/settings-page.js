@@ -15,7 +15,7 @@
         init: function() {
             this.setupPasswordToggle();
             this.setupLogsRetentionDropdown();
-            this.setupFormSubmission();
+            this.handleFormSubmit();
             this.setupSpamDetectionTest();
             this.setupTestEmailSending();
             this.setupFormAnimations();
@@ -119,71 +119,147 @@
         },
         
         /**
-         * Form submission handling
+         * Handle form submission
          */
-        setupFormSubmission: function() {
+        handleFormSubmit: function() {
             const self = this;
             const $form = $('#intellisend-settings-form');
             
             $form.on('submit', function(e) {
                 e.preventDefault();
                 
-                // Validate form first
-                if (!self.validateForm($form)) {
-                    return false;
-                }
+                // Get form data
+                const apiKey = $('#api-key').val();
+                const endpoint = $('#anti-spam-endpoint').val();
+                const hasExistingApiKey = $('#has-existing-api-key').val() === '1';
                 
+                // Get submit button
                 const $submitButton = $form.find('button[type="submit"]');
                 const originalButtonText = $submitButton.text();
                 
-                // Add loading state
+                // Show loading state
                 self.setButtonLoading($submitButton, 'Saving...');
                 
-                // Disable all other buttons
-                $form.find('button').not($submitButton).prop('disabled', true);
+                // Disable all buttons
+                $form.find('button').prop('disabled', true);
                 
-                // Get form data
-                const formData = $form.serialize();
-                
-                // Send AJAX request
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'intellisend_ajax_handler',
-                        sub_action: 'settings_saved',
-                        formData: formData,
-                        nonce: $('#intellisend_settings_nonce').val()
-                    },
-                    success: function(response) {
-                        // Remove any existing notices
-                        $('.intellisend-notice').remove();
-                        
-                        if (response.success) {
-                            // Show success message
-                            self.showNotification($form, 'success', 'Settings saved successfully.');
+                // Check if a new API key is provided
+                if (apiKey.trim() !== '') {
+                    // Validate the new API key
+                    self.validateApiKey(apiKey, endpoint, function(isValid) {
+                        if (isValid) {
+                            // API key is valid, save settings
+                            self.saveSettings($form, $submitButton, originalButtonText);
                         } else {
-                            // Show error message
-                            const errorMessage = response.data && response.data.message ? response.data.message : 'An error occurred while saving settings.';
-                            self.showNotification($form, 'error', errorMessage);
+                            // API key is invalid, reset button state
+                            self.resetButtonLoading($submitButton, originalButtonText);
+                            
+                            // Re-enable all buttons
+                            $form.find('button').prop('disabled', false);
                         }
-                    },
-                    error: function() {
-                        // Show error message for network errors
-                        $('.intellisend-notice').remove();
-                        self.showNotification($form, 'error', 'A network error occurred. Please try again.');
-                    },
-                    complete: function() {
-                        // Reset button state
-                        self.resetButtonLoading($submitButton, originalButtonText);
-                        
-                        // Re-enable all buttons
-                        $form.find('button').prop('disabled', false);
-                        
-                        // Scroll to notification
-                        self.scrollToElement($form.parent(), -50);
+                    });
+                } else if (hasExistingApiKey) {
+                    // No new API key provided, but an existing one is in the database
+                    // Just save the settings without API key validation
+                    self.saveSettings($form, $submitButton, originalButtonText);
+                } else if (endpoint.trim() !== '') {
+                    // No API key provided (new or existing) but endpoint is specified
+                    // Show error message
+                    IntelliSendToast.error('API key is required when an endpoint is specified');
+                    self.resetButtonLoading($submitButton, originalButtonText);
+                    $form.find('button').prop('disabled', false);
+                } else {
+                    // No API key or endpoint provided, just save settings
+                    self.saveSettings($form, $submitButton, originalButtonText);
+                }
+                
+                // Prevent default form submission
+                return false;
+            });
+        },
+        
+        /**
+         * Validate API key with the server
+         */
+        validateApiKey: function(apiKey, endpoint, callback) {
+            const self = this;
+            
+            // Send AJAX request to validate API key
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_ajax_handler',
+                    sub_action: 'api_checked',
+                    api_key: apiKey,
+                    endpoint: endpoint,
+                    nonce: $('#intellisend_settings_nonce').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // API key is valid
+                        IntelliSendToast.success(response.data.message);
+                        callback(true);
+                    } else {
+                        // API key is invalid
+                        IntelliSendToast.error(response.data.message);
+                        callback(false);
                     }
-                });
+                },
+                error: function(xhr, status, error) {
+                    // Network error
+                    IntelliSendToast.error('A network error occurred while validating the API key. Please try again.');
+                    callback(false);
+                }
+            });
+        },
+        
+        /**
+         * Save settings to the server
+         */
+        saveSettings: function($form, $submitButton, originalButtonText) {
+            const self = this;
+            
+            // Get form data
+            const formData = $form.serialize();
+            
+            // Send AJAX request
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_ajax_handler',
+                    sub_action: 'settings_saved',
+                    formData: formData,
+                    nonce: $('#intellisend_settings_nonce').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Show success message
+                        IntelliSendToast.success('Settings saved successfully.');
+                        
+                        // Clear API key field for security
+                        $('#api-key').val('');
+                    } else {
+                        // Show error message
+                        const errorMessage = response.data && response.data.message ? response.data.message : 'An error occurred while saving settings.';
+                        IntelliSendToast.error(errorMessage);
+                    }
+                },
+                error: function() {
+                    // Show error message for network errors
+                    IntelliSendToast.error('A network error occurred. Please try again.');
+                },
+                complete: function() {
+                    // Reset button state
+                    self.resetButtonLoading($submitButton, originalButtonText);
+                    
+                    // Re-enable all buttons
+                    $form.find('button').prop('disabled', false);
+                    
+                    // Scroll to notification
+                    self.scrollToElement($form.parent(), -50);
+                }
             });
         },
         
@@ -192,47 +268,49 @@
          */
         setupSpamDetectionTest: function() {
             const self = this;
-            const $button = $('#test-spam-detection');
+            const $testButton = $('#test-spam-detection');
+            const $messageField = $('#spam-test-message');
+            const $apiKeyField = $('#api-key');
+            const $endpointField = $('#anti-spam-endpoint');
             
-            $button.on('click', function() {
-                // Remove any previous results
-                $('#spam-test-result').remove();
+            $testButton.on('click', function() {
+                // Validate required fields
+                let isValid = true;
+                const hasExistingApiKey = $('#has-existing-api-key').val() === '1';
                 
-                const $apiKeyField = $('#api-key');
-                const $endpointField = $('#anti-spam-endpoint');
-                const $messageField = $('#spam-test-message');
+                if (!$messageField.val().trim()) {
+                    self.showFieldError($messageField, 'Please enter a message to test');
+                    isValid = false;
+                }
                 
+                if (!$apiKeyField.val().trim() && !hasExistingApiKey) {
+                    self.showFieldError($apiKeyField, 'API key is required');
+                    isValid = false;
+                }
+                
+                if (!$endpointField.val().trim()) {
+                    self.showFieldError($endpointField, 'Endpoint is required');
+                    isValid = false;
+                } else if (!self.isValidUrl($endpointField.val())) {
+                    self.showFieldError($endpointField, 'Please enter a valid URL');
+                    isValid = false;
+                }
+                
+                if (!isValid) {
+                    return;
+                }
+                
+                // Clear previous results
+                $('.test-result').remove();
+                
+                // Get values
+                const message = $messageField.val();
                 const apiKey = $apiKeyField.val();
                 const endpoint = $endpointField.val();
-                const testMessage = $messageField.val();
-                
-                // Validation
-                self.clearValidationErrors();
-                
-                if (!apiKey) {
-                    self.showFieldError($apiKeyField, 'Please enter an API key first');
-                    return;
-                }
-                
-                if (!endpoint) {
-                    self.showFieldError($endpointField, 'Please enter an API endpoint first');
-                    return;
-                }
-                
-                if (!testMessage) {
-                    self.showFieldError($messageField, 'Please enter a test message first');
-                    return;
-                }
-                
-                // API endpoint validation
-                if (!self.isValidUrl(endpoint)) {
-                    self.showFieldError($endpointField, 'Please enter a valid URL');
-                    return;
-                }
                 
                 // Set button to loading state
-                const originalButtonText = $button.text();
-                self.setButtonLoading($button, 'Testing...');
+                const originalButtonText = $testButton.text();
+                self.setButtonLoading($testButton, 'Testing...');
                 
                 // Send AJAX request
                 $.ajax({
@@ -241,48 +319,30 @@
                     data: {
                         action: 'intellisend_ajax_handler',
                         sub_action: 'spam_test_sent',
-                        apiKey: apiKey,
+                        message: message,
+                        api_key: apiKey,
                         endpoint: endpoint,
-                        message: testMessage,
-                        nonce: $('#intellisend_settings_nonce').val()
+                        nonce: $('#intellisend_settings_nonce').val(),
+                        use_existing_key: hasExistingApiKey && !apiKey.trim() ? 1 : 0
                     },
                     success: function(response) {
                         if (response.success) {
-                            // Show result
-                            self.createSpamTestResult(response.data.is_spam);
+                            const isSpam = response.data.isSpam;
+                            // Use IntelliSendToast instead of createSpamTestResult
+                            IntelliSendToast.spamResult(isSpam);
                         } else {
-                            // Show error
-                            self.createTestErrorResult('Test failed', response.data.message || 'An unknown error occurred');
+                            const errorMessage = response.data && response.data.message ? response.data.message : 'An error occurred during spam detection.';
+                            IntelliSendToast.error(errorMessage);
                         }
                     },
                     error: function() {
-                        // Show network error
-                        self.createTestErrorResult('Test failed', 'A network error occurred. Please try again.');
+                        IntelliSendToast.error('A network error occurred. Please try again.');
                     },
                     complete: function() {
-                        // Reset button
-                        self.resetButtonLoading($button, originalButtonText);
+                        self.resetButtonLoading($testButton, originalButtonText);
                     }
                 });
             });
-        },
-        
-        /**
-         * Create spam test result HTML
-         */
-        createSpamTestResult: function(isSpam) {
-            // Use the toast component
-            IntelliSendToast.spamResult(isSpam);
-            return '';
-        },
-        
-        /**
-         * Create test error result HTML
-         */
-        createTestErrorResult: function(title, message) {
-            // Use the toast component
-            IntelliSendToast.error(message);
-            return '';
         },
         
         /**
@@ -290,34 +350,41 @@
          */
         setupTestEmailSending: function() {
             const self = this;
-            const $button = $('#send-test-email');
+            const $testButton = $('#send-test-email');
+            const $emailField = $('#test-recipient');
+            const $providerField = $('#default-provider');
             
-            $button.on('click', function() {
-                // Remove any previous results
-                $('#email-test-result').remove();
+            $testButton.on('click', function() {
+                // Validate required fields
+                let isValid = true;
                 
-                const $emailField = $('#test-recipient');
-                const $providerField = $('#default-provider');
-                
-                const testRecipient = $emailField.val();
-                const defaultProvider = $providerField.val();
-                
-                // Validation
-                self.clearValidationErrors();
-                
-                if (!testRecipient) {
-                    self.showFieldError($emailField, 'Please enter a test recipient email address');
-                    return;
-                }
-                
-                if (!self.isValidEmail(testRecipient)) {
+                if (!$emailField.val().trim()) {
+                    self.showFieldError($emailField, 'Please enter a recipient email');
+                    isValid = false;
+                } else if (!self.isValidEmail($emailField.val())) {
                     self.showFieldError($emailField, 'Please enter a valid email address');
+                    isValid = false;
+                }
+                
+                if (!$providerField.val()) {
+                    self.showFieldError($providerField, 'Please select a provider');
+                    isValid = false;
+                }
+                
+                if (!isValid) {
                     return;
                 }
+                
+                // Clear previous results
+                $('.test-result').remove();
+                
+                // Get values
+                const email = $emailField.val();
+                const provider = $providerField.val();
                 
                 // Set button to loading state
-                const originalButtonText = $button.text();
-                self.setButtonLoading($button, 'Sending...');
+                const originalButtonText = $testButton.text();
+                self.setButtonLoading($testButton, 'Sending...');
                 
                 // Send AJAX request
                 $.ajax({
@@ -326,26 +393,23 @@
                     data: {
                         action: 'intellisend_ajax_handler',
                         sub_action: 'test_email_sent',
-                        test_email: testRecipient,
-                        provider_id: defaultProvider,
+                        email: email,
+                        provider: provider,
                         nonce: $('#intellisend_settings_nonce').val()
                     },
                     success: function(response) {
                         if (response.success) {
-                            // Show success result using toast
-                            IntelliSendToast.success(`Test email sent successfully to ${testRecipient}`);
+                            IntelliSendToast.success(response.data.message || 'Test email sent successfully!');
                         } else {
-                            // Show error result using toast
-                            IntelliSendToast.error(response.data.message || 'An unknown error occurred');
+                            const errorMessage = response.data && response.data.message ? response.data.message : 'An error occurred while sending test email.';
+                            IntelliSendToast.error(errorMessage);
                         }
                     },
                     error: function() {
-                        // Show network error
                         IntelliSendToast.error('A network error occurred. Please try again.');
                     },
                     complete: function() {
-                        // Reset button
-                        self.resetButtonLoading($button, originalButtonText);
+                        self.resetButtonLoading($testButton, originalButtonText);
                     }
                 });
             });
@@ -501,54 +565,26 @@
          * Helper: Set button to loading state
          */
         setButtonLoading: function($button, loadingText) {
-            $button.prop('disabled', true).addClass('is-loading');
-            if (loadingText) {
-                $button.data('original-text', $button.text()).text(loadingText);
-            }
-            $button.append('<span class="loading-spinner"></span>');
+            $button.data('original-text', $button.text())
+                .html('<span class="dashicons dashicons-update spinning"></span> ' + loadingText)
+                .prop('disabled', true);
         },
         
         /**
          * Helper: Reset button from loading state
          */
         resetButtonLoading: function($button, originalText) {
-            $button.prop('disabled', false).removeClass('is-loading');
-            $button.find('.loading-spinner').remove();
-            if (originalText) {
-                $button.text(originalText);
-            }
-        },
-        
-        /**
-         * Helper: Show notification
-         */
-        showNotification: function($container, type, message) {
-            const icon = type === 'success' ? 'dashicons-yes-alt' : 'dashicons-warning';
-            
-            const noticeHtml = `
-                <div class="intellisend-notice ${type}">
-                    <span class="intellisend-notice-icon dashicons ${icon}"></span>
-                    <div class="intellisend-notice-content">${message}</div>
-                </div>
-            `;
-            
-            $container.before(noticeHtml);
-            
-            // Add animation class
-            setTimeout(function() {
-                $('.intellisend-notice').addClass('notice-visible');
-            }, 10);
+            $button.html(originalText || $button.data('original-text'))
+                .prop('disabled', false);
         },
         
         /**
          * Helper: Scroll to element
          */
         scrollToElement: function($element, offset = 0) {
-            if ($element.length) {
-                $('html, body').animate({
-                    scrollTop: $element.offset().top + offset
-                }, 300);
-            }
+            $('html, body').animate({
+                scrollTop: $element.offset().top + offset
+            }, 300);
         },
         
         /**
@@ -724,6 +760,56 @@
                     }
                 }
                 
+                /* Debug info styles */
+                .api-debug-container {
+                    margin-top: 20px;
+                    padding: 15px;
+                    background: #f8f9fa;
+                    border-radius: 4px;
+                    border: 1px solid #ddd;
+                }
+                
+                .debug-section {
+                    padding: 10px;
+                    border-radius: 4px;
+                }
+                
+                .debug-section.success {
+                    background: rgba(70, 180, 80, 0.1);
+                    border-left: 4px solid #46b450;
+                }
+                
+                .debug-section.error {
+                    background: rgba(214, 54, 56, 0.1);
+                    border-left: 4px solid #d63638;
+                }
+                
+                .debug-section h3 {
+                    margin-top: 0;
+                    color: #23282d;
+                }
+                
+                .debug-section pre {
+                    background: rgba(0, 0, 0, 0.05);
+                    padding: 10px;
+                    overflow: auto;
+                    max-height: 200px;
+                    font-family: monospace;
+                    font-size: 12px;
+                    white-space: pre-wrap;
+                    word-break: break-all;
+                }
+                
+                .debug-note {
+                    font-style: italic;
+                    color: #666;
+                    margin-top: 10px;
+                }
+                
+                .debug-headers, .debug-body {
+                    margin-bottom: 10px;
+                }
+                
                 /* Dark mode enhancements */
                 @media (prefers-color-scheme: dark) {
                     #page-loading-overlay {
@@ -743,6 +829,23 @@
                     }
                     .section-collapsed {
                         background-color: #23282d;
+                    }
+                    .api-debug-container {
+                        background: #2c3338;
+                        border-color: #1d2327;
+                    }
+                    
+                    .debug-section h3 {
+                        color: #f0f0f1;
+                    }
+                    
+                    .debug-section pre {
+                        background: rgba(0, 0, 0, 0.2);
+                        color: #bbb;
+                    }
+                    
+                    .debug-note {
+                        color: #aaa;
                     }
                 }
             `;

@@ -16,9 +16,19 @@ if (!defined('WPINC')) {
 function intellisend_render_settings_page_content() {
     // Get settings
     $z = IntelliSend_Database::get_settings();
-    
+
+
     // Get providers
     $providers = IntelliSend_Database::get_providers(array( 'configured' => 1 ));
+    
+    // Enqueue the IntelliSendToast script
+    wp_enqueue_script(
+        'intellisend-toast',
+        INTELLISEND_PLUGIN_URL . 'admin/js/intellisend-toast.js',
+        array( 'jquery' ),
+        INTELLISEND_VERSION,
+        true
+    );
     ?>
     <div class="wrap intellisend-settings-wrap">
         <h1><?php echo esc_html__('IntelliSend Settings', 'intellisend'); ?></h1>
@@ -76,8 +86,16 @@ function intellisend_render_settings_page_content() {
                         
                         <div class="intellisend-settings-field">
                             <label for="api-key"><?php echo esc_html__('API Key', 'intellisend'); ?></label>
-                            <input type="password" name="antiSpamApiKey" id="api-key" value="<?php echo esc_attr($z->antiSpamApiKey ?? ''); ?>">
-                            <!-- Password toggle will be inserted here by JavaScript -->
+                            <div class="input-with-button">
+                                <input type="password" name="antiSpamApiKey" id="api-key" value="" placeholder="Enter your API key">
+                                <!-- Password toggle will be inserted here by JavaScript -->
+                            </div>
+                            <?php if (!empty($z->antiSpamApiKey)) : ?>
+                                <p class="api-key-info"><?php echo esc_html__('API key is stored securely. For security reasons, it is not displayed.', 'intellisend'); ?></p>
+                                <input type="hidden" id="has-existing-api-key" value="1">
+                            <?php else: ?>
+                                <input type="hidden" id="has-existing-api-key" value="0">
+                            <?php endif; ?>
                         </div>
                     </div>
                     

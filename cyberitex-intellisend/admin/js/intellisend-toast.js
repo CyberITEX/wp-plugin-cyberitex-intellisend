@@ -21,34 +21,61 @@ const IntelliSendToast = (function($) {
     /**
      * Initialize the toast container
      * @private
+     * @param {object} options - Configuration options
      */
-    function _initContainer() {
+    function _initContainer(options = {}) {
+        // Set default position if not provided
+        const position = options.position || DEFAULT_OPTIONS.position;
+        
         // Create container if it doesn't exist
         if ($('#' + TOAST_CONTAINER_ID).length === 0) {
-            $('body').append(`<div id="${TOAST_CONTAINER_ID}"></div>`);
+            $('body').append(`<div id="${TOAST_CONTAINER_ID}" class="${position}"></div>`);
             
             // Add container styles
             const css = `
                 #${TOAST_CONTAINER_ID} {
                     position: fixed;
-                    bottom: 20px;
-                    right: 20px;
                     z-index: 9999;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    width: 360px;
+                    max-width: 90vw;
+                }
+                
+                /* Position variants */
+                #${TOAST_CONTAINER_ID}.top-right {
+                    top: 16px;
+                    right: 16px;
+                }
+                
+                #${TOAST_CONTAINER_ID}.top-left {
+                    top: 16px;
+                    left: 16px;
+                }
+                
+                #${TOAST_CONTAINER_ID}.bottom-right {
+                    bottom: 16px;
+                    right: 16px;
+                }
+                
+                #${TOAST_CONTAINER_ID}.bottom-left {
+                    bottom: 16px;
+                    left: 16px;
                 }
                 
                 .intellisend-toast {
                     position: relative;
-                    margin-top: 10px;
-                    padding: 10px 20px;
-                    border-radius: 6px;
-                    background: #f8f9fa;
-                    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                    padding: 14px 16px;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.1);
                     display: flex;
-                    align-items: center;
-                    transform: translateY(10px);
+                    align-items: flex-start;
+                    transform: translateY(16px);
                     opacity: 0;
-                    transition: transform 0.3s ease, opacity 0.3s ease;
-                    max-width: 300px;
+                    transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), opacity 0.25s ease;
+                    overflow: hidden;
                 }
                 
                 .intellisend-toast.show {
@@ -56,31 +83,168 @@ const IntelliSendToast = (function($) {
                     opacity: 1;
                 }
                 
+                .intellisend-toast::before {
+                    content: '';
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    height: 100%;
+                    width: 4px;
+                }
+                
+                .intellisend-toast.success {
+                    background: #ffffff;
+                    border-left: none;
+                }
+                
+                .intellisend-toast.success::before {
+                    background: #16a34a;
+                }
+                
                 .intellisend-toast.spam {
-                    background: #fcf0f1;
+                    background: #ffffff;
+                    border-left: none;
+                }
+                
+                .intellisend-toast.spam::before {
+                    background: #dc2626;
                 }
                 
                 .intellisend-toast.not-spam {
-                    background: #f0f6e9;
+                    background: #ffffff;
+                    border-left: none;
+                }
+                
+                .intellisend-toast.not-spam::before {
+                    background: #16a34a;
                 }
                 
                 .intellisend-toast.error {
-                    background: #fcf0f1;
+                    background: #ffffff;
+                    border-left: none;
+                }
+                
+                .intellisend-toast.error::before {
+                    background: #dc2626;
+                }
+                
+                .intellisend-toast .toast-icon {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 24px;
+                    width: 24px;
+                    margin-right: 12px;
+                    border-radius: 50%;
+                    flex-shrink: 0;
+                }
+                
+                .intellisend-toast.success .toast-icon {
+                    background: rgba(22, 163, 74, 0.12);
+                    color: #16a34a;
+                }
+                
+                .intellisend-toast.spam .toast-icon {
+                    background: rgba(220, 38, 38, 0.12);
+                    color: #dc2626;
+                }
+                
+                .intellisend-toast.not-spam .toast-icon {
+                    background: rgba(22, 163, 74, 0.12);
+                    color: #16a34a;
+                }
+                
+                .intellisend-toast.error .toast-icon {
+                    background: rgba(220, 38, 38, 0.12);
+                    color: #dc2626;
                 }
                 
                 .intellisend-toast .dashicons {
-                    margin-right: 10px;
-                    font-size: 20px;
+                    font-size: 16px;
+                    line-height: 24px;
+                    width: 16px;
+                    height: 16px;
                 }
                 
-                .intellisend-toast.spam .dashicons { color: #d63638; }
-                .intellisend-toast.not-spam .dashicons { color: #46b450; }
-                .intellisend-toast.error .dashicons { color: #d63638; }
+                .intellisend-toast .toast-content {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                }
                 
-                .intellisend-toast .toast-content { flex: 1; }
+                .intellisend-toast .toast-title {
+                    font-weight: 600;
+                    font-size: 14px;
+                    line-height: 1.3;
+                    margin-bottom: 2px;
+                    color: #111827;
+                }
+                
+                .intellisend-toast .toast-message {
+                    font-size: 13px;
+                    color: #4b5563;
+                    line-height: 1.4;
+                }
+                
+                .intellisend-toast .toast-close {
+                    cursor: pointer;
+                    color: #9ca3af;
+                    margin-left: 12px;
+                    font-size: 16px;
+                    line-height: 1;
+                    opacity: 0.7;
+                    transition: opacity 0.2s ease;
+                    flex-shrink: 0;
+                    align-self: flex-start;
+                }
+                
+                .intellisend-toast .toast-close:hover {
+                    opacity: 1;
+                }
+                
+                /* Dark mode support */
+                @media (prefers-color-scheme: dark) {
+                    .intellisend-toast {
+                        background: #1f2937;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.3);
+                    }
+                    
+                    .intellisend-toast .toast-title {
+                        color: #f3f4f6;
+                    }
+                    
+                    .intellisend-toast .toast-message {
+                        color: #d1d5db;
+                    }
+                    
+                    .intellisend-toast .toast-close {
+                        color: #9ca3af;
+                    }
+                    
+                    .intellisend-toast.success .toast-icon {
+                        background: rgba(22, 163, 74, 0.2);
+                    }
+                    
+                    .intellisend-toast.spam .toast-icon {
+                        background: rgba(220, 38, 38, 0.2);
+                    }
+                    
+                    .intellisend-toast.not-spam .toast-icon {
+                        background: rgba(22, 163, 74, 0.2);
+                    }
+                    
+                    .intellisend-toast.error .toast-icon {
+                        background: rgba(220, 38, 38, 0.2);
+                    }
+                }
             `;
             
             $('<style>').text(css).appendTo('head');
+        }
+        
+        // Update position if container already exists
+        if (options && options.position) {
+            $('#' + TOAST_CONTAINER_ID).attr('class', position);
         }
     }
     
@@ -122,13 +286,22 @@ const IntelliSendToast = (function($) {
         // Create the toast element
         const $toast = $(`
             <div class="intellisend-toast ${type}">
-                ${icon}
+                <div class="toast-icon">${icon}</div>
                 <div class="toast-content">
-                    <strong>${title}</strong>
-                    ${message ? '<span>' + message + '</span>' : ''}
+                    <div class="toast-title">${title}</div>
+                    ${message ? '<div class="toast-message">' + message + '</div>' : ''}
                 </div>
+                <div class="toast-close">&times;</div>
             </div>
         `);
+        
+        // Add close button functionality
+        $toast.find('.toast-close').on('click', function() {
+            $toast.removeClass('show');
+            setTimeout(function() {
+                $toast.remove();
+            }, options.animationDuration);
+        });
         
         return $toast;
     }
@@ -141,11 +314,11 @@ const IntelliSendToast = (function($) {
      * @param {object} customOptions - Custom options for this toast
      */
     function show(message, type, customOptions) {
-        // Initialize container
-        _initContainer();
-        
         // Merge default options with custom options
         const options = $.extend({}, DEFAULT_OPTIONS, customOptions);
+        
+        // Initialize container with position
+        _initContainer(options);
         
         // Create toast element
         const $toast = _createToastElement(message, type, options);
@@ -160,10 +333,13 @@ const IntelliSendToast = (function($) {
         
         // Auto dismiss after duration
         setTimeout(function() {
-            $toast.removeClass('show');
-            setTimeout(function() {
-                $toast.remove();
-            }, options.animationDuration);
+            // Only dismiss if still in DOM (user might have closed it)
+            if ($toast.parent().length) {
+                $toast.removeClass('show');
+                setTimeout(function() {
+                    $toast.remove();
+                }, options.animationDuration);
+            }
         }, options.duration);
     }
     
