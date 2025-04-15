@@ -16,7 +16,7 @@ function intellisend_render_reports_page_content() {
     $settings = IntelliSend_Database::get_settings();
 
     // Get providers for filtering
-    $providers = IntelliSend_Database::get_providers();
+    $providers = IntelliSend_Database::get_providers(array( 'configured' => 1 ));
 
     // Get routing rules for filtering
     $routing_rules = IntelliSend_Database::get_routing_rules();

@@ -821,6 +821,11 @@ class IntelliSend_Database {
             'order' => 'DESC',
             'status' => '',
             'is_spam' => null,
+            'providerName' => '',
+            'routingRuleId' => '',
+            'date_from' => '',
+            'date_to' => '',
+            'search' => '',
         );
         
         $args = wp_parse_args($args, $defaults);
@@ -831,14 +836,48 @@ class IntelliSend_Database {
         $where = array();
         $where_format = array();
         
+        // Status filter
         if (!empty($args['status'])) {
             $where[] = 'status = %s';
             $where_format[] = $args['status'];
         }
         
+        // Is spam filter
         if ($args['is_spam'] !== null) {
             $where[] = 'isSpam = %d';
             $where_format[] = absint($args['is_spam']);
+        }
+        
+        // Provider filter
+        if (!empty($args['providerName'])) {
+            $where[] = 'providerName = %s';
+            $where_format[] = $args['providerName'];
+        }
+        
+        // Routing rule filter
+        if (!empty($args['routingRuleId'])) {
+            $where[] = 'routingRuleId = %d';
+            $where_format[] = intval($args['routingRuleId']);
+        }
+        
+        // Date range filters
+        if (!empty($args['date_from'])) {
+            $where[] = 'date >= %s';
+            $where_format[] = $args['date_from'] . ' 00:00:00';
+        }
+        
+        if (!empty($args['date_to'])) {
+            $where[] = 'date <= %s';
+            $where_format[] = $args['date_to'] . ' 23:59:59';
+        }
+        
+        // Search filter
+        if (!empty($args['search'])) {
+            $search_term = '%' . $wpdb->esc_like($args['search']) . '%';
+            $where[] = '(subject LIKE %s OR sender LIKE %s OR recipient LIKE %s)';
+            $where_format[] = $search_term;
+            $where_format[] = $search_term;
+            $where_format[] = $search_term;
         }
         
         $where_clause = '';
@@ -868,35 +907,47 @@ class IntelliSend_Database {
         global $wpdb;
         $table = $wpdb->prefix . 'intellisend_reports';
         
+        // Default arguments
         $defaults = array(
             'status' => '',
-            'is_spam' => null,
+            'isSpam' => '',
+            'date_from' => '',
+            'date_to' => '',
+            'search' => '',
         );
         
         $args = wp_parse_args($args, $defaults);
         
-        $where = array();
-        $where_format = array();
+        // Start building the query
+        $query = "SELECT COUNT(*) FROM $table WHERE 1=1";
         
+        // Add filters
         if (!empty($args['status'])) {
-            $where[] = 'status = %s';
-            $where_format[] = $args['status'];
+            $query .= $wpdb->prepare(" AND status = %s", $args['status']);
         }
         
-        if ($args['is_spam'] !== null) {
-            $where[] = 'isSpam = %d';
-            $where_format[] = absint($args['is_spam']);
+        if ($args['isSpam'] !== '') {
+            $query .= $wpdb->prepare(" AND isSpam = %d", absint($args['isSpam']));
         }
         
-        $where_clause = '';
-        if (!empty($where)) {
-            $where_clause = 'WHERE ' . implode(' AND ', $where);
-            $where_clause = $wpdb->prepare($where_clause, $where_format);
+        if (!empty($args['date_from'])) {
+            $query .= $wpdb->prepare(" AND date >= %s", $args['date_from'] . ' 00:00:00');
         }
         
-        $query = "SELECT COUNT(*) FROM $table $where_clause";
+        if (!empty($args['date_to'])) {
+            $query .= $wpdb->prepare(" AND date <= %s", $args['date_to'] . ' 23:59:59');
+        }
         
-        return $wpdb->get_var($query);
+        if (!empty($args['search'])) {
+            $search = '%' . $wpdb->esc_like($args['search']) . '%';
+            $query .= $wpdb->prepare(
+                " AND (subject LIKE %s OR sender LIKE %s OR recipients LIKE %s OR message LIKE %s)",
+                $search, $search, $search, $search
+            );
+        }
+        
+        // Execute the query
+        return (int) $wpdb->get_var($query);
     }
     
     /**
