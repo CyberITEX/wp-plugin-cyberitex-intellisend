@@ -160,17 +160,23 @@
             const description = $option.data('description') || '';
             const helpLink = $option.data('help-link') || '';
             
-            // Update with fade effect
-            $('#provider-description').fadeOut(200, function() {
-                let html = description;
-                
-                // Add help link if available
-                if (helpLink) {
-                    html += ` <a href="${helpLink}" target="_blank" class="help-link">Learn More <span class="dashicons dashicons-external"></span></a>`;
-                }
-                
-                $(this).html(html).fadeIn(200);
-            });
+            // Check if this provider has a description (unconfigured provider)
+            if (description || helpLink) {
+                // Update with fade effect
+                $('#provider-description').fadeOut(200, function() {
+                    let html = description;
+                    
+                    // Add help link if available
+                    if (helpLink) {
+                        html += ` <a href="${helpLink}" target="_blank" class="help-link">Learn More <span class="dashicons dashicons-external"></span></a>`;
+                    }
+                    
+                    $(this).html(html).fadeIn(200);
+                });
+            } else {
+                // No description available (configured provider), hide the description area
+                $('#provider-description').fadeOut(200);
+            }
         },
         
         /**

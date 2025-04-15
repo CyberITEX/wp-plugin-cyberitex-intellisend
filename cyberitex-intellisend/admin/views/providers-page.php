@@ -69,16 +69,22 @@ function intellisend_render_providers_page_content() {
                     <select id="provider-selector" name="provider">
                         <?php if (!empty($providers)) : ?>
                             <?php foreach ($providers as $provider) : ?>
+                                <?php $is_configured = !empty($provider->configured) && $provider->configured == 1; ?>
                                 <option value="<?php echo esc_attr($provider->name); ?>" 
                                     data-id="<?php echo esc_attr($provider->id); ?>"
                                     data-username="<?php echo esc_attr($provider->username); ?>"
                                     data-sender="<?php echo esc_attr($provider->sender); ?>"
                                     data-server="<?php echo esc_attr($provider->server); ?>"
                                     data-port="<?php echo esc_attr($provider->port); ?>"
+                                    <?php if (!$is_configured) : ?>
                                     data-description="<?php echo esc_attr($provider->description); ?>"
                                     data-help-link="<?php echo esc_attr($provider->helpLink); ?>"
+                                    <?php endif; ?>
                                     <?php selected($default_provider_name, $provider->name); ?>>
                                     <?php echo esc_html(ucfirst($provider->name)); ?>
+                                    <?php if ($is_configured) : ?>
+                                    (Configured)
+                                    <?php endif; ?>
                                 </option>
                             <?php endforeach; ?>
                         <?php endif; ?>
