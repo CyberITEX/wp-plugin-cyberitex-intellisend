@@ -1,7 +1,7 @@
 /**
  * IntelliSend Routing Page JavaScript
  * 
- * Handles functionality for the email routing rules management page.
+ * Handles functionality for the email routing rules management page with inline editing.
  */
 
 (function($) {
@@ -14,9 +14,8 @@
          */
         init: function() {
             this.setupEventListeners();
-            this.setupFormValidation();
-            this.setupStatusBadges();
-            this.injectCustomStyles();
+            this.setupValidation();
+            this.setupRecipientTags();
         },
 
         /**
@@ -25,416 +24,333 @@
         setupEventListeners: function() {
             const self = this;
             
-            // Add rule button
+            // Add new rule button
             $('#add-rule-btn').on('click', function() {
-                self.showAddRuleModal();
+                self.addNewRuleRow();
             });
             
             // Edit rule button
-            $('.edit-rule').on('click', function() {
-                const ruleId = $(this).data('id');
-                self.showEditRuleModal(ruleId);
+            $(document).on('click', '.edit-rule', function() {
+                const $row = $(this).closest('.rule-row');
+                self.enterEditMode($row);
+            });
+            
+            // Save rule button
+            $(document).on('click', '.save-rule', function() {
+                const $row = $(this).closest('.rule-row');
+                if (self.validateRow($row)) {
+                    self.saveRule($row);
+                }
+            });
+            
+            // Cancel edit button
+            $(document).on('click', '.cancel-edit', function() {
+                const $row = $(this).closest('.rule-row');
+                self.exitEditMode($row, true);
+            });
+            
+            // Save new rule button
+            $(document).on('click', '.save-new-rule', function() {
+                const $row = $(this).closest('.rule-row');
+                if (self.validateRow($row)) {
+                    self.saveNewRule($row);
+                }
+            });
+            
+            // Cancel new rule button
+            $(document).on('click', '.cancel-new-rule', function() {
+                const $row = $(this).closest('.rule-row');
+                $row.remove();
+            });
+            
+            // Duplicate rule button
+            $(document).on('click', '.duplicate-rule', function() {
+                const $row = $(this).closest('.rule-row');
+                self.duplicateRule($row);
             });
             
             // Delete rule button
-            $('.delete-rule').on('click', function() {
+            $(document).on('click', '.delete-rule', function() {
                 const ruleId = $(this).data('id');
                 const ruleName = $(this).data('name');
                 self.confirmDeleteRule(ruleId, ruleName);
             });
             
             // Activate rule button
-            $('.activate-rule').on('click', function() {
+            $(document).on('click', '.activate-rule', function() {
                 const ruleId = $(this).data('id');
                 self.activateRule(ruleId);
             });
             
             // Deactivate rule button
-            $('.deactivate-rule').on('click', function() {
+            $(document).on('click', '.deactivate-rule', function() {
                 const ruleId = $(this).data('id');
                 self.deactivateRule(ruleId);
             });
             
-            // Close modal buttons
-            $('.intellisend-modal-close').on('click', function() {
-                self.closeModal($(this).closest('.intellisend-modal'));
-            });
-            
-            // Click outside modal to close
-            $(window).on('click', function(event) {
-                if ($(event.target).hasClass('intellisend-modal')) {
-                    self.closeModal($(event.target));
+            // Handle recipient input
+            $(document).on('keydown', '.rule-recipients-input', function(e) {
+                if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+                    e.preventDefault();
+                    const email = $(this).val().trim();
+                    if (email) {
+                        self.addRecipientTag($(this).closest('.recipients-container'), email);
+                        $(this).val('');
+                    }
                 }
             });
             
-            // Escape key to close modal
-            $(document).on('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    $('.intellisend-modal:visible').each(function() {
-                        self.closeModal($(this));
-                    });
-                }
-            });
-            
-            // Add rule form submission
-            $('#add-rule-form').on('submit', function(e) {
-                e.preventDefault();
-                if (self.validateForm($(this))) {
-                    self.addRule($(this));
-                }
-            });
-            
-            // Edit rule form submission
-            $('#edit-rule-form').on('submit', function(e) {
-                e.preventDefault();
-                if (self.validateForm($(this))) {
-                    self.updateRule($(this));
-                }
-            });
-            
-            // Cancel button in forms
-            $('.cancel-form').on('click', function(e) {
-                e.preventDefault();
-                self.closeModal($(this).closest('.intellisend-modal'));
+            // Handle recipient tag removal
+            $(document).on('click', '.remove-recipient', function() {
+                const $container = $(this).closest('.recipients-container');
+                $(this).parent('.recipient-tag').remove();
+                self.updateRecipientInput($container);
             });
         },
         
         /**
          * Set up form validation
          */
-        setupFormValidation: function() {
-            // Add required attribute to required fields
-            $('.form-field.required input, .form-field.required select, .form-field.required textarea').attr('required', true);
-            
-            // Add validation for number inputs
-            $('input[type="number"]').on('input', function() {
-                const min = parseInt($(this).attr('min'));
-                const max = parseInt($(this).attr('max'));
-                let value = parseInt($(this).val());
+        setupValidation: function() {
+            // Add email validation regex
+            this.emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        },
+        
+        /**
+         * Set up recipient tags functionality
+         */
+        setupRecipientTags: function() {
+            // Initial setup for existing tags
+            $('.recipients-container').each(function() {
+                const $container = $(this);
+                const recipients = $container.find('.rule-recipients').val();
                 
-                if (!isNaN(min) && value < min) {
-                    $(this).val(min);
-                }
-                
-                if (!isNaN(max) && value > max) {
-                    $(this).val(max);
+                if (recipients) {
+                    recipients.split(',').forEach(function(recipient) {
+                        const email = recipient.trim();
+                        if (email) {
+                            IntelliSendRouting.addRecipientTag($container, email);
+                        }
+                    });
                 }
             });
         },
         
         /**
-         * Set up status badges with appropriate colors
+         * Add a new recipient tag
          */
-        setupStatusBadges: function() {
-            // Already handled by CSS classes
-        },
-        
-        /**
-         * Show add rule modal
-         */
-        showAddRuleModal: function() {
-            // Reset form
-            $('#add-rule-form')[0].reset();
-            
-            // Clear validation errors
-            this.clearValidationErrors($('#add-rule-form'));
-            
-            // Show modal
-            $('#add-rule-modal').show();
-            
-            // Focus first field
-            $('#add-rule-form input:first').focus();
-        },
-        
-        /**
-         * Show edit rule modal
-         */
-        showEditRuleModal: function(ruleId) {
-            const self = this;
-            
-            // Show loading state
-            $('#edit-rule-modal').addClass('loading');
-            $('#edit-rule-modal').show();
-            
-            // Get rule data via AJAX
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'intellisend_get_routing_rule',
-                    id: ruleId,
-                    nonce: intellisendData.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        self.populateEditForm(response.data);
-                    } else {
-                        self.showNotification('error', response.data || 'Failed to load routing rule details.');
-                        self.closeModal($('#edit-rule-modal'));
-                    }
-                },
-                error: function() {
-                    self.showNotification('error', 'A network error occurred while loading the routing rule.');
-                    self.closeModal($('#edit-rule-modal'));
-                },
-                complete: function() {
-                    $('#edit-rule-modal').removeClass('loading');
-                }
-            });
-        },
-        
-        /**
-         * Populate edit form with rule data
-         */
-        populateEditForm: function(rule) {
-            // Set form values
-            $('#edit-rule-id').val(rule.id);
-            $('#edit-rule-name').val(rule.name);
-            $('#edit-rule-provider').val(rule.defaultProviderName);
-            $('#edit-rule-patterns').val(rule.subjectPatterns);
-            $('#edit-rule-priority').val(rule.priority);
-            $('#edit-rule-enabled').prop('checked', rule.enabled);
-            $('#edit-rule-antispam').prop('checked', rule.antiSpamEnabled);
-            
-            // Check if the provider is still configured
-            if (!rule.providerConfigured) {
-                // Show warning about unconfigured provider
-                const warningHtml = `
-                    <div class="form-warning">
-                        <span class="dashicons dashicons-warning"></span>
-                        <p>${intellisendData.strings.unconfiguredProvider.replace('%s', rule.defaultProviderName)}</p>
-                    </div>
-                `;
-                $('#edit-rule-provider').after(warningHtml);
-                $('#edit-rule-provider').addClass('has-warning');
+        addRecipientTag: function($container, email) {
+            // Validate email
+            if (!this.emailRegex.test(email)) {
+                this.showError(intellisendData.strings.invalidRecipient);
+                return false;
             }
             
-            // Focus first field
-            $('#edit-rule-name').focus();
+            // Check if already exists
+            let alreadyExists = false;
+            $container.find('.recipient-tag').each(function() {
+                if ($(this).text().replace('×', '') === email) {
+                    alreadyExists = true;
+                    return false;
+                }
+            });
+            
+            if (alreadyExists) {
+                return false;
+            }
+            
+            // Add tag
+            const $tag = $('<span class="recipient-tag">' + email + '<span class="remove-recipient">×</span></span>');
+            $container.find('.recipients-tags').append($tag);
+            
+            // Update hidden input
+            this.updateRecipientInput($container);
+            
+            return true;
         },
         
         /**
-         * Confirm delete rule
+         * Update the hidden input with recipient values
          */
-        confirmDeleteRule: function(ruleId, ruleName) {
-            const self = this;
+        updateRecipientInput: function($container) {
+            const recipients = [];
             
-            // Create confirmation dialog
-            const confirmMessage = `Are you sure you want to delete the routing rule "${ruleName}"? This action cannot be undone.`;
+            $container.find('.recipient-tag').each(function() {
+                recipients.push($(this).text().replace('×', ''));
+            });
             
-            if (confirm(confirmMessage)) {
-                self.deleteRule(ruleId);
+            $container.find('.rule-recipients').val(recipients.join(','));
+        },
+        
+        /**
+         * Add a new rule row to the table
+         */
+        addNewRuleRow: function() {
+            // Clone the template
+            const template = document.getElementById('new-rule-template');
+            const $newRow = $(template.content.cloneNode(true));
+            
+            // Append to table
+            $('#routing-rules-table').append($newRow);
+            
+            // Show edit inputs by default
+            const $row = $('#routing-rules-table').find('.new-rule-row');
+            $row.find('.edit-mode').show();
+            $row.find('.view-mode').hide();
+            
+            // Focus on the first input
+            $row.find('.rule-name').focus();
+        },
+        
+        /**
+         * Duplicate an existing rule
+         */
+        duplicateRule: function($row) {
+            const ruleId = $row.data('id');
+            const isDefault = $row.data('is-default');
+            
+            // Don't allow duplicating default rule
+            if (isDefault) {
+                this.showError('Default rule cannot be duplicated');
+                return;
+            }
+            
+            // Create a new rule row
+            this.addNewRuleRow();
+            const $newRow = $('#routing-rules-table .new-rule-row');
+            
+            // Copy values from the source row
+            $newRow.find('.rule-name').val($row.find('.rule-name').val() + ' (Copy)');
+            $newRow.find('.rule-patterns').val($row.find('.rule-patterns').val());
+            $newRow.find('.rule-provider').val($row.find('.rule-provider').val());
+            $newRow.find('.rule-priority').val($row.find('.rule-priority').val());
+            $newRow.find('.rule-enabled').val($row.find('.rule-enabled').val());
+            $newRow.find('.rule-antispam').val($row.find('.rule-antispam').val());
+            
+            // Copy recipients
+            const recipients = $row.find('.rule-recipients').val();
+            if (recipients) {
+                recipients.split(',').forEach((recipient) => {
+                    const email = recipient.trim();
+                    if (email) {
+                        this.addRecipientTag($newRow.find('.recipients-container'), email);
+                    }
+                });
             }
         },
         
         /**
-         * Add new rule
+         * Enter edit mode for a row
          */
-        addRule: function($form) {
-            const self = this;
-            const $submitButton = $form.find('button[type="submit"]');
+        enterEditMode: function($row) {
+            // Show edit inputs
+            $row.find('.edit-mode').show();
+            $row.find('.view-mode').hide();
             
-            // Set loading state
-            this.setButtonLoading($submitButton, 'Adding...');
+            // Show save/cancel buttons
+            $row.find('.edit-rule').hide();
+            $row.find('.duplicate-rule').hide();
+            $row.find('.activate-rule, .deactivate-rule').hide();
+            $row.find('.delete-rule').hide();
+            $row.find('.save-rule, .cancel-edit').show();
             
-            // Get form data
-            const formData = $form.serialize();
-            
-            // Send AJAX request
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'intellisend_add_routing_rule',
-                    formData: formData,
-                    nonce: intellisendData.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        self.showNotification('success', 'Routing rule added successfully.');
-                        
-                        // Reload page after a short delay
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1000);
-                    } else {
-                        self.showNotification('error', response.data || 'Failed to add routing rule.');
-                        self.resetButtonLoading($submitButton, 'Add Rule');
-                    }
-                },
-                error: function() {
-                    self.showNotification('error', 'A network error occurred. Please try again.');
-                    self.resetButtonLoading($submitButton, 'Add Rule');
-                }
-            });
+            // Focus on the name field
+            $row.find('.rule-name').focus();
         },
         
         /**
-         * Update existing rule
+         * Exit edit mode for a row
          */
-        updateRule: function($form) {
-            const self = this;
-            const $submitButton = $form.find('button[type="submit"]');
+        exitEditMode: function($row, revertChanges) {
+            if (revertChanges) {
+                // Revert any changed inputs
+                $row.find('.rule-name').val($row.find('.view-mode[data-field="name"]').text());
+                $row.find('.rule-patterns').val($row.find('.view-mode[data-field="patterns"]').text());
+                $row.find('.rule-provider').val($row.find('.view-mode[data-field="provider"]').text());
+                $row.find('.rule-priority').val($row.find('.view-mode[data-field="priority"]').text());
+                $row.find('.rule-enabled').val($row.find('.rule-enabled option:contains("' + $row.find('.view-mode[data-field="enabled"] span').text() + '")').val());
+                $row.find('.rule-antispam').val($row.find('.rule-antispam option:contains("' + $row.find('.view-mode[data-field="antispam"] span').text() + '")').val());
+            } else {
+                // Update view mode with the new values
+                $row.find('.view-mode[data-field="name"]').text($row.find('.rule-name').val());
+                $row.find('.view-mode[data-field="patterns"]').text($row.find('.rule-patterns').val());
+                $row.find('.view-mode[data-field="provider"]').text($row.find('.rule-provider option:selected').text());
+                $row.find('.view-mode[data-field="priority"]').text($row.find('.rule-priority').val());
+                
+                // Update status display
+                const enabled = $row.find('.rule-enabled').val() === '1';
+                const statusClass = enabled ? 'status-active' : 'status-inactive';
+                const statusText = enabled ? 'Active' : 'Inactive';
+                $row.find('.view-mode[data-field="enabled"] span').attr('class', statusClass).text(statusText);
+                
+                // Update anti-spam display
+                const antispam = $row.find('.rule-antispam').val() === '1';
+                const antispamClass = antispam ? 'antispam-active' : 'antispam-inactive';
+                const antispamText = antispam ? 'On' : 'Off';
+                $row.find('.view-mode[data-field="antispam"] span').attr('class', antispamClass).text(antispamText);
+                
+                // Update recipients display
+                $row.find('.view-mode[data-field="recipients"]').text($row.find('.rule-recipients').val());
+            }
             
-            // Set loading state
-            this.setButtonLoading($submitButton, 'Updating...');
+            // Hide edit inputs
+            $row.find('.edit-mode').hide();
+            $row.find('.view-mode').show();
             
-            // Get form data
-            const formData = $form.serialize();
+            // Show action buttons
+            $row.find('.edit-rule').show();
+            $row.find('.duplicate-rule').show();
+            $row.find('.save-rule, .cancel-edit').hide();
             
-            // Send AJAX request
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'intellisend_update_routing_rule',
-                    formData: formData,
-                    nonce: intellisendData.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        self.showNotification('success', 'Routing rule updated successfully.');
-                        
-                        // Reload page after a short delay
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1000);
-                    } else {
-                        self.showNotification('error', response.data || 'Failed to update routing rule.');
-                        self.resetButtonLoading($submitButton, 'Update Rule');
-                    }
-                },
-                error: function() {
-                    self.showNotification('error', 'A network error occurred. Please try again.');
-                    self.resetButtonLoading($submitButton, 'Update Rule');
-                }
-            });
+            // Show appropriate status toggle
+            if ($row.find('.rule-enabled').val() === '1') {
+                $row.find('.deactivate-rule').show();
+                $row.find('.activate-rule').hide();
+            } else {
+                $row.find('.deactivate-rule').hide();
+                $row.find('.activate-rule').show();
+            }
+            
+            // Show delete button except for default rule
+            if ($row.data('is-default') !== 1) {
+                $row.find('.delete-rule').show();
+            }
         },
         
         /**
-         * Delete rule
+         * Validate a rule row before saving
          */
-        deleteRule: function(ruleId) {
-            const self = this;
-            
-            // Show loading notification
-            this.showNotification('warning', 'Deleting routing rule...');
-            
-            // Send AJAX request
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'intellisend_delete_routing_rule',
-                    id: ruleId,
-                    nonce: intellisendData.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        self.showNotification('success', 'Routing rule deleted successfully.');
-                        
-                        // Reload page after a short delay
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1000);
-                    } else {
-                        self.showNotification('error', response.data || 'Failed to delete routing rule.');
-                    }
-                },
-                error: function() {
-                    self.showNotification('error', 'A network error occurred. Please try again.');
-                }
-            });
-        },
-        
-        /**
-         * Activate rule
-         */
-        activateRule: function(ruleId) {
-            const self = this;
-            
-            // Send AJAX request
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'intellisend_activate_routing_rule',
-                    id: ruleId,
-                    nonce: intellisendData.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        self.showNotification('success', 'Routing rule activated successfully.');
-                        
-                        // Reload page after a short delay
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1000);
-                    } else {
-                        self.showNotification('error', response.data || 'Failed to activate routing rule.');
-                    }
-                },
-                error: function() {
-                    self.showNotification('error', 'A network error occurred. Please try again.');
-                }
-            });
-        },
-        
-        /**
-         * Deactivate rule
-         */
-        deactivateRule: function(ruleId) {
-            const self = this;
-            
-            // Send AJAX request
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'intellisend_deactivate_routing_rule',
-                    id: ruleId,
-                    nonce: intellisendData.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        self.showNotification('success', 'Routing rule deactivated successfully.');
-                        
-                        // Reload page after a short delay
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1000);
-                    } else {
-                        self.showNotification('error', response.data || 'Failed to deactivate routing rule.');
-                    }
-                },
-                error: function() {
-                    self.showNotification('error', 'A network error occurred. Please try again.');
-                }
-            });
-        },
-        
-        /**
-         * Validate form
-         */
-        validateForm: function($form) {
-            this.clearValidationErrors($form);
+        validateRow: function($row) {
+            // Clear previous errors
+            $row.find('.has-error').removeClass('has-error');
+            $('.field-error').remove();
             
             let isValid = true;
+            const isDefaultRule = $row.data('is-default') === 1;
             
-            // Check required fields
-            $form.find('[required]').each(function() {
-                if (!$(this).val().trim()) {
-                    const $field = $(this);
-                    const fieldName = $field.prev('label').text() || 'This field';
-                    
-                    IntelliSendRouting.showFieldError($field, `${fieldName} is required.`);
+            // Validate required fields
+            if (!$row.find('.rule-name').val().trim()) {
+                this.showFieldError($row.find('.rule-name'), intellisendData.strings.requiredField);
+                isValid = false;
+            }
+            
+            if (!$row.find('.rule-patterns').val().trim()) {
+                this.showFieldError($row.find('.rule-patterns'), intellisendData.strings.requiredField);
+                isValid = false;
+            }
+            
+            if (!$row.find('.rule-provider').val()) {
+                this.showFieldError($row.find('.rule-provider'), intellisendData.strings.requiredField);
+                isValid = false;
+            }
+            
+            // Validate priority (1-100) - skip for default rule
+            if (!isDefaultRule) {
+                const priority = parseInt($row.find('.rule-priority').val());
+                if (isNaN(priority) || priority < 1 || priority > 100) {
+                    this.showFieldError($row.find('.rule-priority'), 'Priority must be between 1 and 100');
                     isValid = false;
                 }
-            });
-            
-            // Focus first error field
-            if (!isValid) {
-                $form.find('.has-error').first().focus();
             }
             
             return isValid;
@@ -449,179 +365,313 @@
         },
         
         /**
-         * Clear validation errors
+         * Save an existing rule
          */
-        clearValidationErrors: function($form) {
-            $form.find('.has-error').removeClass('has-error');
-            $form.find('.field-error').remove();
+        saveRule: function($row) {
+            const self = this;
+            const ruleId = $row.data('id');
+            const isDefault = $row.data('is-default') === 1;
+            
+            // Prepare the data
+            const formData = {
+                id: ruleId,
+                name: $row.find('.rule-name').val().trim(),
+                subjectPatterns: $row.find('.rule-patterns').val().trim(),
+                defaultProviderName: $row.find('.rule-provider').val(),
+                recipients: $row.find('.rule-recipients').val(),
+                enabled: $row.find('.rule-enabled').val(),
+                antiSpamEnabled: $row.find('.rule-antispam').val()
+            };
+            
+            // Add priority if not default rule
+            if (!isDefault) {
+                formData.priority = $row.find('.rule-priority').val();
+            }
+            
+            // Show loading
+            this.showLoading();
+            
+            // Send AJAX request
+            $.ajax({
+                url: intellisendData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_update_routing_rule',
+                    nonce: intellisendData.nonce,
+                    formData: formData
+                },
+                success: function(response) {
+                    if (response.success) {
+                        self.exitEditMode($row, false);
+                        self.showSuccess(response.data || intellisendData.strings.saveSuccess);
+                    } else {
+                        const errorMsg = response.data || intellisendData.strings.saveFailed;
+                        self.showError(errorMsg);
+                        console.error('Save Error:', response);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', xhr, status, error);
+                    self.showError('A network error occurred: ' + (error || 'undefined'));
+                },
+                complete: function() {
+                    self.hideLoading();
+                }
+            });
         },
         
         /**
-         * Close modal
+         * Save a new rule
          */
-        closeModal: function($modal) {
-            $modal.hide();
+        saveNewRule: function($row) {
+            const self = this;
+            
+            // Prepare the data
+            const formData = {
+                name: $row.find('.rule-name').val().trim(),
+                subjectPatterns: $row.find('.rule-patterns').val().trim(),
+                defaultProviderName: $row.find('.rule-provider').val(),
+                recipients: $row.find('.rule-recipients').val(),
+                priority: $row.find('.rule-priority').val(),
+                enabled: $row.find('.rule-enabled').val(),
+                antiSpamEnabled: $row.find('.rule-antispam').val()
+            };
+            
+            // Show loading
+            this.showLoading();
+            
+            // Send AJAX request
+            $.ajax({
+                url: intellisendData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_add_routing_rule',
+                    nonce: intellisendData.nonce,
+                    formData: formData
+                },
+                success: function(response) {
+                    if (response.success) {
+                        self.showSuccess(response.data || intellisendData.strings.saveSuccess);
+                        // Reload page to show new rule with proper ID
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        const errorMsg = response.data || intellisendData.strings.saveFailed;
+                        self.showError(errorMsg);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error);
+                    self.showError('A network error occurred: ' + error);
+                },
+                complete: function() {
+                    self.hideLoading();
+                }
+            });
         },
         
         /**
-         * Set button to loading state
+         * Confirm rule deletion
          */
-        setButtonLoading: function($button, loadingText) {
-            $button.prop('disabled', true).addClass('is-loading');
-            $button.data('original-text', $button.text()).text(loadingText);
-            $button.append('<span class="loading-spinner"></span>');
+        confirmDeleteRule: function(ruleId, ruleName) {
+            if (confirm(intellisendData.strings.confirmDelete.replace('{name}', ruleName))) {
+                this.deleteRule(ruleId);
+            }
         },
         
         /**
-         * Reset button from loading state
+         * Delete a rule
          */
-        resetButtonLoading: function($button, originalText) {
-            $button.prop('disabled', false).removeClass('is-loading');
-            $button.find('.loading-spinner').remove();
-            $button.text(originalText || $button.data('original-text'));
+        deleteRule: function(ruleId) {
+            const self = this;
+            
+            // Show loading
+            this.showLoading();
+            
+            // Send AJAX request
+            $.ajax({
+                url: intellisendData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_delete_routing_rule',
+                    nonce: intellisendData.nonce,
+                    id: ruleId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Remove the row
+                        $('.rule-row[data-id="' + ruleId + '"]').fadeOut(300, function() {
+                            $(this).remove();
+                        });
+                        self.showSuccess('Rule deleted successfully.');
+                    } else {
+                        self.showError(response.data || 'Failed to delete rule.');
+                    }
+                },
+                error: function() {
+                    self.showError('A network error occurred. Please try again.');
+                },
+                complete: function() {
+                    self.hideLoading();
+                }
+            });
         },
         
         /**
-         * Show notification
+         * Activate a rule
+         */
+        activateRule: function(ruleId) {
+            const self = this;
+            const $row = $('.rule-row[data-id="' + ruleId + '"]');
+            
+            // Show loading
+            this.showLoading();
+            
+            // Send AJAX request
+            $.ajax({
+                url: intellisendData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_activate_routing_rule',
+                    nonce: intellisendData.nonce,
+                    id: ruleId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Update status in view
+                        $row.find('.view-mode[data-field="enabled"] span')
+                            .removeClass('status-inactive')
+                            .addClass('status-active')
+                            .text('Active');
+                        
+                        // Update form value
+                        $row.find('.rule-enabled').val('1');
+                        
+                        // Update buttons
+                        $row.find('.activate-rule').hide();
+                        $row.find('.deactivate-rule').show();
+                        
+                        self.showSuccess('Rule activated successfully.');
+                    } else {
+                        self.showError(response.data || 'Failed to activate rule.');
+                    }
+                },
+                error: function() {
+                    self.showError('A network error occurred. Please try again.');
+                },
+                complete: function() {
+                    self.hideLoading();
+                }
+            });
+        },
+        
+        /**
+         * Deactivate a rule
+         */
+        deactivateRule: function(ruleId) {
+            const self = this;
+            const $row = $('.rule-row[data-id="' + ruleId + '"]');
+            
+            // Show loading
+            this.showLoading();
+            
+            // Send AJAX request
+            $.ajax({
+                url: intellisendData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_deactivate_routing_rule',
+                    nonce: intellisendData.nonce,
+                    id: ruleId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Update status in view
+                        $row.find('.view-mode[data-field="enabled"] span')
+                            .removeClass('status-active')
+                            .addClass('status-inactive')
+                            .text('Inactive');
+                        
+                        // Update form value
+                        $row.find('.rule-enabled').val('0');
+                        
+                        // Update buttons
+                        $row.find('.deactivate-rule').hide();
+                        $row.find('.activate-rule').show();
+                        
+                        self.showSuccess('Rule deactivated successfully.');
+                    } else {
+                        self.showError(response.data || 'Failed to deactivate rule.');
+                    }
+                },
+                error: function() {
+                    self.showError('A network error occurred. Please try again.');
+                },
+                complete: function() {
+                    self.hideLoading();
+                }
+            });
+        },
+        
+        /**
+         * Show a success notification
+         */
+        showSuccess: function(message) {
+            this.showNotification('success', message);
+        },
+        
+        /**
+         * Show an error notification
+         */
+        showError: function(message) {
+            this.showNotification('error', message);
+        },
+        
+        /**
+         * Show a notification
          */
         showNotification: function(type, message) {
             // Remove any existing notifications
             $('.intellisend-notice').remove();
             
-            const icon = type === 'success' ? 'dashicons-yes-alt' : 
-                         type === 'warning' ? 'dashicons-warning' : 'dashicons-dismiss';
+            const icon = type === 'success' ? 'dashicons-yes-alt' : 'dashicons-warning';
             
-            const noticeHtml = `
+            const $notice = $(`
                 <div class="intellisend-notice ${type}">
                     <span class="intellisend-notice-icon dashicons ${icon}"></span>
                     <div class="intellisend-notice-content">${message}</div>
                 </div>
-            `;
+            `);
             
-            $('.intellisend-admin h1').after(noticeHtml);
+            $('.intellisend-admin h1').after($notice);
             
-            // Auto dismiss after 5 seconds for success messages
-            if (type === 'success') {
-                setTimeout(function() {
-                    $('.intellisend-notice').fadeOut(300, function() {
-                        $(this).remove();
-                    });
-                }, 5000);
-            }
+            // Auto-dismiss after 5 seconds
+            setTimeout(function() {
+                $notice.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }, 5000);
         },
         
         /**
-         * Inject custom styles for dynamic elements
+         * Show loading overlay
          */
-        injectCustomStyles: function() {
-            const customStyles = `
-                /* Loading overlay for modal */
-                .intellisend-modal.loading .intellisend-modal-body {
-                    position: relative;
-                    min-height: 200px;
-                }
-                
-                .intellisend-modal.loading .intellisend-modal-body:after {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(255, 255, 255, 0.7);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                
-                .intellisend-modal.loading .intellisend-modal-body:before {
-                    content: '';
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    margin: -20px 0 0 -20px;
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 50%;
-                    border: 3px solid rgba(0, 0, 0, 0.1);
-                    border-top-color: #2271b1;
-                    z-index: 1;
-                    animation: spin 0.8s linear infinite;
-                }
-                
-                /* Button loading state */
-                .button.is-loading {
-                    position: relative;
-                    color: transparent !important;
-                }
-                
-                .button.is-loading .loading-spinner {
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    margin-top: -7px;
-                    margin-left: -7px;
-                }
-                
-                /* Tooltip styles */
-                .intellisend-tooltip {
-                    position: relative;
-                    display: inline-block;
-                    cursor: help;
-                }
-                
-                .intellisend-tooltip .tooltip-text {
-                    visibility: hidden;
-                    width: 200px;
-                    background-color: #333;
-                    color: #fff;
-                    text-align: center;
-                    border-radius: 4px;
-                    padding: 8px;
-                    position: absolute;
-                    z-index: 1;
-                    bottom: 125%;
-                    left: 50%;
-                    margin-left: -100px;
-                    opacity: 0;
-                    transition: opacity 0.3s;
-                    font-size: 12px;
-                    line-height: 1.4;
-                    pointer-events: none;
-                }
-                
-                .intellisend-tooltip .tooltip-text::after {
-                    content: "";
-                    position: absolute;
-                    top: 100%;
-                    left: 50%;
-                    margin-left: -5px;
-                    border-width: 5px;
-                    border-style: solid;
-                    border-color: #333 transparent transparent transparent;
-                }
-                
-                .intellisend-tooltip:hover .tooltip-text {
-                    visibility: visible;
-                    opacity: 1;
-                }
-                
-                /* Dark mode adjustments */
-                @media (prefers-color-scheme: dark) {
-                    .admin-color-modern .intellisend-modal.loading .intellisend-modal-body:after {
-                        background: rgba(30, 30, 30, 0.7);
-                    }
-                    
-                    .admin-color-modern .intellisend-modal.loading .intellisend-modal-body:before {
-                        border-color: rgba(255, 255, 255, 0.1);
-                        border-top-color: #2271b1;
-                    }
-                }
-            `;
+        showLoading: function() {
+            const template = document.getElementById('loading-overlay-template');
+            const $loading = $(template.content.cloneNode(true));
             
-            $('<style id="intellisend-routing-dynamic-styles"></style>')
-                .text(customStyles)
-                .appendTo('head');
+            // Append to admin content
+            $('.intellisend-admin-content').append($loading);
+        },
+        
+        /**
+         * Hide loading overlay
+         */
+        hideLoading: function() {
+            $('.intellisend-loading-overlay').fadeOut(200, function() {
+                $(this).remove();
+            });
         }
     };
 

@@ -1,12 +1,12 @@
 /**
  * IntelliSend Routing Page Styles
  *
- * Modern and user-friendly styles for the email routing management page.
+ * Enhanced styles for the routing management page with inline editing
  */
 
 /* Container Styles */
 .intellisend-admin {
-    max-width: 1200px;
+    max-width: 100%;
     margin: 20px 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     color: #1e1e1e;
@@ -20,6 +20,7 @@
 }
 
 .intellisend-admin-content {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 24px;
@@ -56,39 +57,77 @@
     overflow-x: auto;
 }
 
-.intellisend-routing-list table {
+.intellisend-table {
     width: 100%;
     border-collapse: collapse;
     border-spacing: 0;
     font-size: 14px;
+    table-layout: fixed;
 }
 
-.intellisend-routing-list th {
+.intellisend-table th {
     text-align: left;
     padding: 12px 8px;
     border-bottom: 1px solid #dcdcde;
     font-weight: 600;
     color: #1e1e1e;
     white-space: nowrap;
+    position: sticky;
+    top: 0;
+    background: #f9fafc;
+    z-index: 1;
 }
 
-.intellisend-routing-list td {
+/* Column widths */
+.intellisend-table .col-name {
+    width: 15%;
+}
+
+.intellisend-table .col-pattern {
+    width: 20%;
+}
+
+.intellisend-table .col-provider {
+    width: 12%;
+}
+
+.intellisend-table .col-recipients {
+    width: 20%;
+}
+
+.intellisend-table .col-priority {
+    width: 8%;
+}
+
+.intellisend-table .col-status,
+.intellisend-table .col-antispam {
+    width: 8%;
+}
+
+.intellisend-table .col-actions {
+    width: 15%;
+}
+
+.intellisend-table td {
     padding: 12px 8px;
     border-bottom: 1px solid #f0f0f1;
     vertical-align: middle;
+    word-break: break-word;
 }
 
-.intellisend-routing-list tr:last-child td {
+.intellisend-table tr:last-child td {
     border-bottom: none;
 }
 
-.intellisend-routing-list tr:hover {
+.intellisend-table tr:hover {
     background-color: #f9fafc;
 }
 
 /* Status Badges */
 .status-active,
 .status-inactive,
+.antispam-active,
+.antispam-inactive,
 .default-badge {
     display: inline-flex;
     align-items: center;
@@ -97,6 +136,9 @@
     font-size: 12px;
     font-weight: 500;
     line-height: 1;
+    text-align: center;
+    min-width: 60px;
+    justify-content: center;
 }
 
 .status-active {
@@ -109,25 +151,45 @@
     color: #646970;
 }
 
-.default-badge {
+.antispam-active {
     background-color: #e6f0fa;
     color: #2271b1;
+}
+
+.antispam-inactive {
+    background-color: #f6f7f7;
+    color: #646970;
+}
+
+.default-badge {
+    background-color: #fcf9e8;
+    color: #997404;
     margin-left: 8px;
+    min-width: auto;
 }
 
 /* Action Buttons */
+.action-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
 .action-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 6px;
-    margin: 0 2px;
+    width: 30px;
+    height: 30px;
     border-radius: 4px;
     background: transparent;
     border: none;
     cursor: pointer;
     color: #2271b1;
     transition: all 0.2s ease;
+    padding: 0;
 }
 
 .action-button:hover {
@@ -136,9 +198,17 @@
 }
 
 .action-button .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.action-button.edit-rule {
+    color: #2271b1;
+}
+
+.action-button.duplicate-rule {
+    color: #007cba;
 }
 
 .action-button.delete-rule {
@@ -150,169 +220,139 @@
     color: #b32d2e;
 }
 
+.action-button.save-rule,
+.action-button.save-new-rule {
+    color: #2a7d3f;
+}
+
+.action-button.save-rule:hover,
+.action-button.save-new-rule:hover {
+    background-color: rgba(42, 125, 63, 0.1);
+}
+
+.action-button.cancel-edit,
+.action-button.cancel-new-rule {
+    color: #d63638;
+}
+
+.action-button.activate-rule,
+.action-button.deactivate-rule {
+    color: #007cba;
+}
+
 /* Add Rule Button */
 .add-rule-button {
     margin: 0 24px 24px;
 }
 
-/* Forms */
-.intellisend-form {
-    padding: 24px;
-    border-top: 1px solid #f0f0f1;
+.add-rule-button .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.intellisend-form h3 {
+.add-rule-button .dashicons {
     font-size: 16px;
-    font-weight: 600;
-    margin: 0 0 16px;
-    color: #1e1e1e;
+    width: 16px;
+    height: 16px;
 }
 
-.form-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 16px;
-}
-
-.form-field {
-    flex: 1;
-    min-width: 200px;
-}
-
-.form-field label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: #1e1e1e;
-    font-size: 14px;
-}
-
-.form-field input[type="text"],
-.form-field input[type="number"],
-.form-field select,
-.form-field textarea {
+/* Forms - Edit Mode */
+.edit-mode {
     width: 100%;
-    padding: 8px 12px;
+}
+
+.intellisend-table .editable {
+    position: relative;
+}
+
+.intellisend-table input[type="text"],
+.intellisend-table input[type="number"],
+.intellisend-table select,
+.intellisend-table textarea {
+    width: 100%;
+    padding: 8px;
     border: 1px solid #dcdcde;
     border-radius: 4px;
     background-color: #fff;
-    color: #1e1e1e;
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 13px;
+    box-shadow: 0 0 0 transparent;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
-.form-field select {
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg width='20' height='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 8l5 5 5-5' stroke='%23555' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-    background-size: 16px;
-    padding-right: 30px;
-}
-
-.form-field textarea {
-    min-height: 100px;
-    resize: vertical;
-}
-
-.form-field input[type="text"]:focus,
-.form-field input[type="number"]:focus,
-.form-field select:focus,
-.form-field textarea:focus {
+.intellisend-table input[type="text"]:focus,
+.intellisend-table input[type="number"]:focus,
+.intellisend-table select:focus,
+.intellisend-table textarea:focus {
     border-color: #2271b1;
-    box-shadow: 0 0 0 1px #2271b1, 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 0 0 1px #2271b1;
     outline: none;
 }
 
-.form-field .description {
+.intellisend-table textarea {
+    height: 60px;
+    resize: vertical;
+}
+
+/* Field validation */
+.has-error {
+    border-color: #d63638 !important;
+    box-shadow: 0 0 0 1px #d63638 !important;
+}
+
+.field-error {
+    display: block;
+    position: absolute;
+    color: #d63638;
     font-size: 12px;
-    color: #646970;
-    margin-top: 4px;
-    line-height: 1.4;
+    margin-top: 2px;
+    background: #fff;
+    padding: 2px 5px;
+    border-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    z-index: 10;
 }
 
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 24px;
-}
-
-/* Modal Styles */
-.intellisend-modal {
-    display: none;
-    position: fixed;
-    z-index: 100000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0, 0, 0, 0.5);
-    animation: fadeIn 0.3s ease;
-}
-
-.intellisend-modal-content {
-    position: relative;
-    background-color: #fff;
-    margin: 5% auto;
-    padding: 0;
-    border-radius: 8px;
-    max-width: 600px;
-    width: 90%;
-    max-height: 90vh;
-    overflow: hidden;
+/* Recipients field */
+.recipients-container {
     display: flex;
     flex-direction: column;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
-    animation: slideDown 0.3s ease;
+    width: 100%;
 }
 
-.intellisend-modal-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid #f0f0f1;
-    background: #f9fafc;
+.rule-recipients-input {
+    margin-bottom: 5px;
+}
+
+.recipients-tags {
     display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+.recipient-tag {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
+    padding: 2px 8px;
+    background: #e6f0fa;
+    color: #2271b1;
+    border-radius: 12px;
+    font-size: 12px;
+    position: relative;
 }
 
-.intellisend-modal-header h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: #1e1e1e;
-}
-
-.intellisend-modal-close {
-    background: transparent;
-    border: none;
-    color: #787c82;
+.remove-recipient {
+    margin-left: 5px;
     cursor: pointer;
-    padding: 0;
-    font-size: 24px;
+    font-weight: bold;
+    font-size: 14px;
     line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    transition: all 0.2s ease;
+    opacity: 0.7;
 }
 
-.intellisend-modal-close:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-    color: #1e1e1e;
-}
-
-.intellisend-modal-body {
-    padding: 24px;
-    overflow-y: auto;
-    max-height: calc(90vh - 140px);
+.remove-recipient:hover {
+    opacity: 1;
 }
 
 /* Notifications */
@@ -325,7 +365,7 @@
     border-left: 3px solid transparent;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
     animation: slideIn 0.3s ease-out;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .intellisend-notice.success {
@@ -345,7 +385,7 @@
 
 .intellisend-notice-icon {
     margin-right: 10px;
-    font-size: 16px;
+    font-size: 18px;
     line-height: 1;
 }
 
@@ -366,60 +406,32 @@
     line-height: 1.4;
 }
 
-/* Loading State */
-.is-loading {
-    position: relative;
-    pointer-events: none;
+/* Loading overlay */
+.intellisend-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(2px);
 }
 
-.loading-spinner {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    margin-left: 6px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
+.intellisend-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(34, 113, 177, 0.2);
     border-radius: 50%;
-    border-top-color: #fff;
+    border-top-color: #2271b1;
     animation: spin 0.8s linear infinite;
 }
 
-.button-secondary .loading-spinner {
-    border-color: rgba(0, 0, 0, 0.1);
-    border-top-color: #2c3338;
-}
-
-/* Validation Styles */
-.has-error {
-    border-color: #d63638 !important;
-    box-shadow: 0 0 0 1px #d63638 !important;
-}
-
-.field-error {
-    color: #d63638;
-    font-size: 12px;
-    margin-top: 4px;
-    display: block;
-}
-
-/* Animations */
 @keyframes spin {
     to { transform: rotate(360deg); }
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 @keyframes slideIn {
@@ -433,69 +445,89 @@
     }
 }
 
-/* Responsive Styles */
-@media screen and (max-width: 782px) {
-    .form-field {
-        flex-basis: 100%;
+/* Responsive adjustments */
+@media screen and (max-width: 1200px) {
+    .intellisend-table {
+        table-layout: auto;
     }
     
-    .intellisend-routing-list th,
-    .intellisend-routing-list td {
-        padding: 10px 6px;
-    }
-    
-    .intellisend-modal-content {
-        width: 95%;
-        margin: 10% auto;
-    }
-    
-    .intellisend-modal-header,
-    .intellisend-modal-body {
-        padding: 16px;
+    .action-buttons {
+        flex-wrap: wrap;
+        justify-content: flex-start;
     }
 }
 
-/* Dark Mode Support */
+@media screen and (max-width: 782px) {
+    .intellisend-routing-list {
+        padding: 0 12px 12px;
+    }
+    
+    .intellisend-table th,
+    .intellisend-table td {
+        padding: 8px 4px;
+    }
+    
+    .intellisend-table th {
+        display: none;
+    }
+    
+    .intellisend-table td {
+        display: flex;
+        align-items: center;
+        padding: 8px;
+        border-bottom: none;
+        position: relative;
+    }
+    
+    .intellisend-table td::before {
+        content: attr(data-field);
+        font-weight: 600;
+        margin-right: 10px;
+        min-width: 100px;
+    }
+    
+    .intellisend-table tr {
+        display: block;
+        border: 1px solid #dcdcde;
+        border-radius: 4px;
+        margin-bottom: 12px;
+        padding: 8px;
+    }
+    
+    .action-buttons {
+        justify-content: flex-start;
+    }
+}
+
+/* Dark mode compatibility */
 @media (prefers-color-scheme: dark) {
-    .admin-color-modern .intellisend-card,
-    .admin-color-modern .intellisend-modal-content {
+    .admin-color-modern .intellisend-card {
         background: #1f2329;
     }
     
     .admin-color-modern .intellisend-card h2,
-    .admin-color-modern .intellisend-modal-header,
-    .admin-color-modern .intellisend-routing-list th {
+    .admin-color-modern .intellisend-table th {
         background: #151a22;
         border-color: #32373c;
     }
     
-    .admin-color-modern .intellisend-routing-list td,
-    .admin-color-modern .intellisend-routing-list th {
+    .admin-color-modern .intellisend-table td {
         border-color: #32373c;
     }
     
-    .admin-color-modern .intellisend-routing-list tr:hover {
+    .admin-color-modern .intellisend-table tr:hover {
         background-color: #151a22;
     }
     
-    .admin-color-modern .form-field label,
-    .admin-color-modern .intellisend-card h2,
-    .admin-color-modern .intellisend-modal-header h3,
-    .admin-color-modern .intellisend-form h3 {
-        color: #e2e4e7;
+    .admin-color-modern .intellisend-loading-overlay {
+        background: rgba(30, 30, 30, 0.7);
     }
     
-    .admin-color-modern .form-field input[type="text"],
-    .admin-color-modern .form-field input[type="number"],
-    .admin-color-modern .form-field select,
-    .admin-color-modern .form-field textarea {
-        background-color: #2c3338;
-        border-color: #3c434a;
-        color: #e2e4e7;
-    }
-    
-    .admin-color-modern .intellisend-card p,
-    .admin-color-modern .form-field .description {
-        color: #a7aaad;
+    .admin-color-modern input, 
+    .admin-color-modern select, 
+    .admin-color-modern textarea {
+        background-color: #32373c;
+        color: #f0f0f1;
+        border-color: #50575e;
     }
 }
