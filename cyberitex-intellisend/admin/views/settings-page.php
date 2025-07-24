@@ -101,11 +101,9 @@ function intellisend_render_settings_page_content() {
                     
                     <div class="intellisend-settings-row">
                         <div class="intellisend-settings-field full-width">
-                            <label for="spam-test-message"><?php echo esc_html__('Test Message', 'intellisend'); ?></label>
-                            <div class="textarea-with-button">
-                                <textarea name="spamTestMessage" id="spam-test-message" rows="3" placeholder="Enter a message to test for spam detection"><?php echo esc_textarea($z->spamTestMessage ?? ''); ?></textarea>
-                                <button type="button" id="test-spam-detection" class="button button-secondary"><?php echo esc_html__('Test', 'intellisend'); ?></button>
-                            </div>
+                            <label for="anti-spam-subject-patterns"><?php echo esc_html__('Check Spam Only for These Subjects', 'intellisend'); ?></label>
+                            <textarea name="antiSpamSubjectPatterns" id="anti-spam-subject-patterns" rows="4" placeholder="contact*&#10;inquiry*&#10;*support*"><?php echo esc_textarea($settings->antiSpamSubjectPatterns ?? ''); ?></textarea>
+                            <span class="field-description"><?php echo esc_html__('Enter subject patterns (one per line). Use * for wildcards. Leave empty to check all emails based on routing rules.', 'intellisend'); ?></span>
                         </div>
                     </div>
                 </div>

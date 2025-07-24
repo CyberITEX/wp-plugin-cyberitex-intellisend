@@ -248,6 +248,7 @@ class IntelliSend_Database
                 defaultProviderName varchar(100),
                 antiSpamEndPoint varchar(255),
                 antiSpamApiKey varchar(255),
+                antiSpamSubjectPatterns text,
                 testRecipient varchar(255),
                 spamTestMessage text,
                 logsRetentionDays int(11) DEFAULT 365,
