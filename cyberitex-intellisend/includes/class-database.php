@@ -111,6 +111,63 @@ class IntelliSend_Database
         }
     }
 
+
+
+    /**
+ * Create routing table with updated structure
+ */
+public static function create_routing_table() {
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    $routing_table = $wpdb->prefix . 'intellisend_routing';
+    $sql = "CREATE TABLE IF NOT EXISTS $routing_table (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        name varchar(100) NOT NULL,
+        pattern_type enum('wildcard','starts_with','contains','ends_with','regex') DEFAULT 'wildcard',
+        subject_patterns text NOT NULL,
+        default_provider_name varchar(100) NOT NULL,
+        recipients text,
+        anti_spam_enabled tinyint(1) DEFAULT 0,
+        enabled tinyint(1) DEFAULT 1,
+        priority int(11) DEFAULT 100,
+        is_default tinyint(1) DEFAULT 0,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY name (name),
+        KEY enabled (enabled),
+        KEY priority (priority),
+        KEY is_default (is_default)
+    ) $charset_collate;";
+    
+    if (!function_exists('dbDelta')) {
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    }
+    dbDelta($sql);
+    
+    // Insert default routing rule if the table is empty
+    $count = $wpdb->get_var("SELECT COUNT(*) FROM $routing_table");
+    if ($count == 0) {
+        $admin_email = get_option('admin_email');
+        $wpdb->insert(
+            $routing_table,
+            array(
+                'name' => 'Default',
+                'pattern_type' => 'wildcard',
+                'subject_patterns' => '*',
+                'default_provider_name' => 'other',
+                'recipients' => $admin_email,
+                'anti_spam_enabled' => 0,
+                'enabled' => 1,
+                'priority' => -1,
+                'is_default' => 1,
+            )
+        );
+    }
+}
+
+
     /**
      * Create all required database tables on plugin activation.
      */
@@ -275,39 +332,7 @@ class IntelliSend_Database
             }
 
             // Create routing table
-            $routing_table = $wpdb->prefix . 'intellisend_routing';
-            $sql = "CREATE TABLE IF NOT EXISTS $routing_table (
-                id bigint(20) NOT NULL AUTO_INCREMENT,
-                name varchar(100) NOT NULL,
-                subjectPatterns text NOT NULL,
-                defaultProviderName varchar(100) NOT NULL,
-                recipients text,
-                antiSpamEnabled tinyint(1) DEFAULT 1,
-                enabled tinyint(1) DEFAULT 1,
-                priority int(11) DEFAULT 100,
-                PRIMARY KEY  (id),
-                KEY name (name),
-                KEY enabled (enabled),
-                KEY priority (priority)
-            ) $charset_collate;";
-            dbDelta($sql);
-
-            // Insert default routing rule if the table is empty
-            $count = $wpdb->get_var("SELECT COUNT(*) FROM $routing_table");
-            if ($count == 0) {
-                $wpdb->insert(
-                    $routing_table,
-                    array(
-                        'name' => 'Default Rule',
-                        'subjectPatterns' => '*',
-                        'defaultProviderName' => 'other',
-                        'recipients' => '',
-                        'antiSpamEnabled' => 0,
-                        'enabled' => 1,
-                        'priority' => -1,
-                    )
-                );
-            }
+            self::create_routing_table();
 
             // Create reports table
             $reports_table = $wpdb->prefix . 'intellisend_reports';
@@ -758,133 +783,156 @@ class IntelliSend_Database
     }
 
     /**
-     * Create a new routing rule
-     * 
-     * @param object $data Routing rule data
-     * @return int|false The ID of the inserted routing rule or false on failure
-     */
-    public static function create_routing_rule($data)
-    {
-        global $wpdb;
-        $table = $wpdb->prefix . 'intellisend_routing';
+ * Create routing rule with validation
+ */
+public static function create_routing_rule($data) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'intellisend_routing';
 
-        // Ensure we have required fields
-        if (empty($data->name) || empty($data->subjectPatterns) || empty($data->defaultProviderName)) {
-            return false;
-        }
-
-        $result = $wpdb->insert(
-            $table,
-            array(
-                'name' => sanitize_text_field($data->name),
-                'subjectPatterns' => sanitize_textarea_field($data->subjectPatterns),
-                'defaultProviderName' => sanitize_text_field($data->defaultProviderName),
-                'recipients' => isset($data->recipients) ? sanitize_textarea_field($data->recipients) : '',
-                'antiSpamEnabled' => isset($data->antiSpamEnabled) ? absint($data->antiSpamEnabled) : 1,
-                'enabled' => isset($data->enabled) ? absint($data->enabled) : 1,
-                'priority' => isset($data->priority) ? intval($data->priority) : 10,
-            )
-        );
-
-        return $result ? $wpdb->insert_id : false;
+    // Validate required fields
+    if (empty($data->name) || empty($data->subject_patterns) || empty($data->default_provider_name)) {
+        return false;
     }
 
-    /**
-     * Update an existing routing rule
-     * 
-     * @param object $data Routing rule data
-     * @return bool True on success, false on failure
-     */
-    public static function update_routing_rule($data)
-    {
-        global $wpdb;
-        $table = $wpdb->prefix . 'intellisend_routing';
+    // Validate pattern type
+    $valid_pattern_types = array('wildcard', 'starts_with', 'contains', 'ends_with', 'regex');
+    $pattern_type = isset($data->pattern_type) ? $data->pattern_type : 'wildcard';
+    if (!in_array($pattern_type, $valid_pattern_types)) {
+        $pattern_type = 'wildcard';
+    }
 
-        // Ensure we have the ID
-        if (empty($data->id)) {
-            return false;
+    // Don't allow creating another default rule
+    if (isset($data->is_default) && $data->is_default) {
+        return false;
+    }
+
+    // Set default recipients to admin email if not specified
+    $recipients = isset($data->recipients) ? $data->recipients : '';
+    if (empty($recipients)) {
+        $recipients = get_option('admin_email');
+    }
+
+    $result = $wpdb->insert(
+        $table,
+        array(
+            'name' => sanitize_text_field($data->name),
+            'pattern_type' => $pattern_type,
+            'subject_patterns' => sanitize_textarea_field($data->subject_patterns),
+            'default_provider_name' => sanitize_text_field($data->default_provider_name),
+            'recipients' => sanitize_textarea_field($recipients),
+            'anti_spam_enabled' => isset($data->anti_spam_enabled) ? absint($data->anti_spam_enabled) : 0,
+            'enabled' => isset($data->enabled) ? absint($data->enabled) : 1,
+            'priority' => isset($data->priority) ? intval($data->priority) : 100,
+            'is_default' => 0,
+        )
+    );
+
+    return $result ? $wpdb->insert_id : false;
+}
+
+/**
+ * Update routing rule with validation
+ */
+public static function update_routing_rule($data) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'intellisend_routing';
+
+    // Ensure we have the ID
+    if (empty($data->id)) {
+        return false;
+    }
+
+    // Get existing rule
+    $existing_rule = self::get_routing_rule($data->id);
+    if (!$existing_rule) {
+        return false;
+    }
+
+    // Don't allow changing default rule's essential properties
+    $is_default_rule = $existing_rule->is_default == 1;
+    
+    $update_data = array();
+
+    // Basic fields (always updatable)
+    if (isset($data->name)) {
+        $update_data['name'] = sanitize_text_field($data->name);
+    }
+    
+    if (isset($data->default_provider_name)) {
+        $update_data['default_provider_name'] = sanitize_text_field($data->default_provider_name);
+    }
+    
+    if (isset($data->recipients)) {
+        $recipients = sanitize_textarea_field($data->recipients);
+        if (empty($recipients)) {
+            $recipients = get_option('admin_email');
         }
+        $update_data['recipients'] = $recipients;
+    }
+    
+    if (isset($data->anti_spam_enabled)) {
+        $update_data['anti_spam_enabled'] = absint($data->anti_spam_enabled);
+    }
+    
+    if (isset($data->enabled)) {
+        $update_data['enabled'] = absint($data->enabled);
+    }
 
-        // Special handling for rule ID 1 (default rule)
-        $is_default_rule = ($data->id == 1);
-        if ($is_default_rule) {
-            // For default rule, ensure priority is -1
-            $data->priority = -1;
+    // For default rule, maintain fixed properties
+    if ($is_default_rule) {
+        $update_data['priority'] = -1;
+        $update_data['is_default'] = 1;
+        $update_data['pattern_type'] = 'wildcard';
+        $update_data['subject_patterns'] = '*';
+    } else {
+        // Non-default rules can have these updated
+        if (isset($data->subject_patterns)) {
+            $update_data['subject_patterns'] = sanitize_textarea_field($data->subject_patterns);
         }
-
-        // Get existing rule to preserve any unspecified fields
-        $existing_rule = self::get_routing_rule($data->id);
-        if (!$existing_rule) {
-            return false;
+        
+        if (isset($data->pattern_type)) {
+            $valid_types = array('wildcard', 'starts_with', 'contains', 'ends_with', 'regex');
+            if (in_array($data->pattern_type, $valid_types)) {
+                $update_data['pattern_type'] = $data->pattern_type;
+            }
         }
-
-        // Build update data
-        $update_data = array();
-
-        // Always update name and patterns
-        if (isset($data->name)) {
-            $update_data['name'] = sanitize_text_field($data->name);
-        }
-
-        if (isset($data->subjectPatterns)) {
-            $update_data['subjectPatterns'] = sanitize_textarea_field($data->subjectPatterns);
-        }
-
-        if (isset($data->defaultProviderName)) {
-            $update_data['defaultProviderName'] = sanitize_text_field($data->defaultProviderName);
-        }
-
-        if (isset($data->recipients)) {
-            $update_data['recipients'] = sanitize_textarea_field($data->recipients);
-        }
-
-        if (isset($data->antiSpamEnabled)) {
-            $update_data['antiSpamEnabled'] = absint($data->antiSpamEnabled);
-        }
-
-        if (isset($data->enabled)) {
-            $update_data['enabled'] = absint($data->enabled);
-        }
-
-        // Only update priority if not the default rule
-        if (!$is_default_rule && isset($data->priority)) {
+        
+        if (isset($data->priority)) {
             $update_data['priority'] = intval($data->priority);
         }
-
-        // Update rule
-        $result = $wpdb->update(
-            $table,
-            $update_data,
-            array('id' => $data->id)
-        );
-
-        return $result !== false;
     }
 
-    /**
-     * Delete a routing rule
-     * 
-     * @param int $id Routing rule ID
-     * @return bool True on success, false on failure
-     */
-    public static function delete_routing_rule($id)
-    {
-        global $wpdb;
-        $table = $wpdb->prefix . 'intellisend_routing';
+    $update_data['updated_at'] = current_time('mysql');
 
-        // Get rule to check if it's the default one
-        $rule = self::get_routing_rule($id);
-        if (!$rule) {
-            return false;
-        }
+    $result = $wpdb->update(
+        $table,
+        $update_data,
+        array('id' => $data->id)
+    );
 
-        // Don't allow deleting the default rule (id = 1 or priority = -1)
-        if ($id == 1 || $rule->priority == -1) {
-            return false;
-        }
+    return $result !== false;
+}
 
-        return $wpdb->delete($table, array('id' => $id)) !== false;
+/**
+ * Delete routing rule (prevent deleting default rule)
+ */
+public static function delete_routing_rule($id) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'intellisend_routing';
+
+    // Get rule to check if it's default
+    $rule = self::get_routing_rule($id);
+    if (!$rule) {
+        return false;
     }
+
+    // Don't allow deleting the default rule
+    if ($rule->is_default == 1) {
+        return false;
+    }
+
+    return $wpdb->delete($table, array('id' => $id)) !== false;
+}
 
     /**
      * Reports CRUD Operations

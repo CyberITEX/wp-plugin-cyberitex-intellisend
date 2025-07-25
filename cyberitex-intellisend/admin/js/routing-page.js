@@ -376,11 +376,11 @@
             const formData = {
                 id: ruleId,
                 name: $row.find('.rule-name').val().trim(),
-                subjectPatterns: $row.find('.rule-patterns').val().trim(),
-                defaultProviderName: $row.find('.rule-provider').val(),
+                subject_patterns: $row.find('.rule-patterns').val().trim(),
+                default_provider_name: $row.find('.rule-provider').val(),
                 recipients: $row.find('.rule-recipients').val(),
                 enabled: $row.find('.rule-enabled').val(),
-                antiSpamEnabled: $row.find('.rule-antispam').val()
+                anti_spam_enabled: $row.find('.rule-antispam').val()
             };
             
             // Add priority if not default rule
@@ -429,12 +429,12 @@
             // Prepare the data
             const formData = {
                 name: $row.find('.rule-name').val().trim(),
-                subjectPatterns: $row.find('.rule-patterns').val().trim(),
-                defaultProviderName: $row.find('.rule-provider').val(),
+                subject_patterns: $row.find('.rule-patterns').val().trim(),
+                default_provider_name: $row.find('.rule-provider').val(),
                 recipients: $row.find('.rule-recipients').val(),
                 priority: $row.find('.rule-priority').val(),
                 enabled: $row.find('.rule-enabled').val(),
-                antiSpamEnabled: $row.find('.rule-antispam').val()
+                anti_spam_enabled: $row.find('.rule-antispam').val()
             };
             
             // Show loading

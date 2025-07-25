@@ -31,6 +31,7 @@ class IntelliSend_Admin
         // Register hooks
         add_action('admin_menu', array(__CLASS__, 'register_admin_menu'));
         add_action('admin_enqueue_scripts', array(__CLASS__, 'enqueue_admin_scripts'));
+        add_action('admin_init', array(__CLASS__, 'check_providers_redirect'));
 
         // Add settings link to plugins page
         add_filter(
@@ -41,6 +42,28 @@ class IntelliSend_Admin
         // Initialize AJAX handler - only when in admin area
         if (is_admin() && class_exists('IntelliSend_Ajax')) {
             IntelliSend_Ajax::init();
+        }
+    }
+    
+    /**
+     * Check if providers exist and redirect if needed
+     */
+    public static function check_providers_redirect()
+    {
+        // Only run on the main settings page
+        if (!isset($_GET['page']) || $_GET['page'] !== 'intellisend') {
+            return;
+        }
+        
+        // Check if any providers are configured
+        if (class_exists('IntelliSend_Database')) {
+            $providers = IntelliSend_Database::get_providers(array('configured' => 1));
+            
+            // If no providers are configured, redirect to providers page
+            if (empty($providers)) {
+                wp_redirect(admin_url('admin.php?page=intellisend-providers'));
+                exit;
+            }
         }
     }
 

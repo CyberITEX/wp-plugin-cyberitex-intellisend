@@ -63,7 +63,7 @@ function intellisend_render_routing_page_content()
                                     $is_default_rule = ($rule->id == 1 || $rule->priority == -1);
                                     $provider_name = '';
                                     foreach ($providers as $provider) {
-                                        if ($provider->name == $rule->defaultProviderName) {
+                                        if ($provider->name == $rule->default_provider_name) {
                                             $provider_name = $provider->name;
                                             break;
                                         }
@@ -78,14 +78,14 @@ function intellisend_render_routing_page_content()
                                             <?php endif; ?>
                                         </td>
                                         <td class="editable" data-field="patterns">
-                                            <span class="view-mode"><?php echo esc_html($rule->subjectPatterns); ?></span>
-                                            <textarea class="edit-mode rule-patterns" style="display:none;"><?php echo esc_textarea($rule->subjectPatterns); ?></textarea>
+                                            <span class="view-mode"><?php echo esc_html($rule->subject_patterns); ?></span>
+                                            <textarea class="edit-mode rule-patterns" style="display:none;"><?php echo esc_textarea($rule->subject_patterns); ?></textarea>
                                         </td>
                                         <td class="editable" data-field="provider">
                                             <span class="view-mode"><?php echo esc_html($provider_name); ?></span>
                                             <select class="edit-mode rule-provider" style="display:none;">
                                                 <?php foreach ($providers as $provider) : ?>
-                                                    <option value="<?php echo esc_attr($provider->name); ?>" <?php selected($rule->defaultProviderName, $provider->name); ?>>
+                                                    <option value="<?php echo esc_attr($provider->name); ?>" <?php selected($rule->default_provider_name, $provider->name); ?>>
                                                         <?php echo esc_html($provider->name); ?>
                                                     </option>
                                                 <?php endforeach; ?>
@@ -134,15 +134,15 @@ function intellisend_render_routing_page_content()
                                         </td>
                                         <td class="editable" data-field="antispam">
                                             <span class="view-mode">
-                                                <?php if ($rule->antiSpamEnabled) : ?>
+                                                <?php if ($rule->anti_spam_enabled) : ?>
                                                     <span class="antispam-active"><?php echo esc_html__('On', 'intellisend'); ?></span>
                                                 <?php else : ?>
                                                     <span class="antispam-inactive"><?php echo esc_html__('Off', 'intellisend'); ?></span>
                                                 <?php endif; ?>
                                             </span>
                                             <select class="edit-mode rule-antispam" style="display:none;">
-                                                <option value="1" <?php selected($rule->antiSpamEnabled, 1); ?>><?php echo esc_html__('On', 'intellisend'); ?></option>
-                                                <option value="0" <?php selected($rule->antiSpamEnabled, 0); ?>><?php echo esc_html__('Off', 'intellisend'); ?></option>
+                                                <option value="1" <?php selected($rule->anti_spam_enabled, 1); ?>><?php echo esc_html__('On', 'intellisend'); ?></option>
+                                                <option value="0" <?php selected($rule->anti_spam_enabled, 0); ?>><?php echo esc_html__('Off', 'intellisend'); ?></option>
                                             </select>
                                         </td>
                                         <td class="actions">
