@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * admin\class-ajax.php
  * IntelliSend AJAX Handler
  *
  * Handles all AJAX requests for the IntelliSend plugin
@@ -527,6 +528,10 @@ class IntelliSend_Ajax
      */
     public static function handle_add_routing_rule()
     {
+        // Enable debugging
+        error_log('=== INTELLISEND ADD ROUTING RULE START ===');
+        error_log('POST data: ' . print_r($_POST, true));
+
         // Check nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
             error_log('IntelliSend: Nonce validation failed in handle_add_routing_rule');
@@ -550,9 +555,7 @@ class IntelliSend_Ajax
 
         $formData = array();
         parse_str($_POST['formData'], $formData);
-
-        // Log the received data for debugging
-        error_log('IntelliSend: Add routing rule data: ' . print_r($formData, true));
+        error_log('IntelliSend: Parsed form data: ' . print_r($formData, true));
 
         // Validate required fields
         if (empty($formData['name'])) {
@@ -570,25 +573,38 @@ class IntelliSend_Ajax
             return;
         }
 
+        // Handle pattern type with case-insensitive validation
+        $valid_pattern_types = array('wildcard', 'starts_with', 'contains', 'ends_with', 'regex');
+        $pattern_type = isset($formData['pattern_type']) ? strtolower(sanitize_text_field($formData['pattern_type'])) : 'wildcard';
+        if (!in_array($pattern_type, $valid_pattern_types)) {
+            $pattern_type = 'wildcard';
+        }
+        error_log('IntelliSend: Add - Pattern type after validation: ' . $pattern_type);
+
         // Prepare rule data
         $rule = new stdClass();
         $rule->name = sanitize_text_field($formData['name']);
         $rule->default_provider_name = sanitize_text_field($formData['default_provider_name']);
         $rule->subject_patterns = sanitize_textarea_field($formData['subject_patterns']);
+        $rule->pattern_type = $pattern_type;
         $rule->recipients = isset($formData['recipients']) && !empty($formData['recipients']) ? sanitize_textarea_field($formData['recipients']) : get_option('admin_email');
         $rule->priority = isset($formData['priority']) ? intval($formData['priority']) : 10;
         $rule->enabled = isset($formData['enabled']) ? absint($formData['enabled']) : 1;
         $rule->anti_spam_enabled = isset($formData['anti_spam_enabled']) ? absint($formData['anti_spam_enabled']) : 1;
 
+        error_log('IntelliSend: Add - Final rule object: ' . print_r($rule, true));
+
         // Create the routing rule
         $result = IntelliSend_Database::create_routing_rule($rule);
+        error_log('IntelliSend: Add - Database result: ' . var_export($result, true));
+
         if (!$result) {
             error_log('IntelliSend: Failed to create routing rule in database');
             wp_send_json_error('Failed to add routing rule. Database operation failed.');
             return;
         }
 
-        // Send success response
+        error_log('=== INTELLISEND ADD ROUTING RULE SUCCESS ===');
         wp_send_json_success('Routing rule added successfully.');
     }
 
@@ -597,6 +613,10 @@ class IntelliSend_Ajax
      */
     public static function handle_update_routing_rule()
     {
+        // Enable detailed debugging
+        error_log('=== INTELLISEND UPDATE ROUTING RULE START ===');
+        error_log('POST data: ' . print_r($_POST, true));
+
         // Check nonce
         if (!isset($_POST['nonce'])) {
             error_log('IntelliSend: No nonce provided in handle_update_routing_rule');
@@ -604,12 +624,15 @@ class IntelliSend_Ajax
             return;
         }
 
-        // Get the received nonce
         $received_nonce = $_POST['nonce'];
+        error_log('IntelliSend: Received nonce: ' . $received_nonce);
 
         // Try both the routing nonce and the ajax nonce for backward compatibility
         $is_routing_nonce_valid = wp_verify_nonce($received_nonce, 'intellisend_routing_nonce');
         $is_ajax_nonce_valid = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
+
+        error_log('IntelliSend: Routing nonce valid: ' . ($is_routing_nonce_valid ? 'true' : 'false'));
+        error_log('IntelliSend: Ajax nonce valid: ' . ($is_ajax_nonce_valid ? 'true' : 'false'));
 
         if (!$is_routing_nonce_valid && !$is_ajax_nonce_valid) {
             error_log('IntelliSend: Invalid nonce in handle_update_routing_rule: ' . $received_nonce);
@@ -624,7 +647,7 @@ class IntelliSend_Ajax
             return;
         }
 
-        // Get form data - handle both array and serialized string formats
+        // Get form data
         if (!isset($_POST['formData'])) {
             error_log('IntelliSend: No form data provided in handle_update_routing_rule');
             wp_send_json_error('Invalid form data.');
@@ -632,36 +655,41 @@ class IntelliSend_Ajax
         }
 
         $formData = $_POST['formData'];
+        error_log('IntelliSend: Raw formData: ' . print_r($formData, true));
 
-        // If formData is a serialized string, parse it
+        // Parse form data if it's a string
         if (is_string($formData)) {
             $parsed_data = array();
             parse_str($formData, $parsed_data);
             $formData = $parsed_data;
         }
 
-        // Log the received data for debugging
-        error_log('IntelliSend: Update routing rule data: ' . print_r($formData, true));
+        error_log('IntelliSend: Parsed form data: ' . print_r($formData, true));
 
         // Validate rule ID
         if (empty($formData['id'])) {
+            error_log('IntelliSend: No rule ID provided');
             wp_send_json_error('Rule ID is required.');
             return;
         }
 
+        $rule_id = intval($formData['id']);
+        error_log('IntelliSend: Rule ID: ' . $rule_id);
+
         // Validate required fields
         if (empty($formData['name'])) {
+            error_log('IntelliSend: Rule name is empty');
             wp_send_json_error('Rule name is required.');
             return;
         }
 
         if (empty($formData['default_provider_name'])) {
+            error_log('IntelliSend: Provider name is empty');
             wp_send_json_error('Provider is required.');
             return;
         }
 
         // Get existing rule
-        $rule_id = intval($formData['id']);
         $existing_rule = IntelliSend_Database::get_routing_rule($rule_id);
         if (!$existing_rule) {
             error_log('IntelliSend: Rule not found with ID: ' . $rule_id);
@@ -669,44 +697,101 @@ class IntelliSend_Ajax
             return;
         }
 
-        // Special handling for default rule
-        $is_default_rule = ($rule_id == 1 || $existing_rule->priority == -1 || $existing_rule->is_default == 1);
+        error_log('IntelliSend: Existing rule: ' . print_r($existing_rule, true));
+
+        // Check if it's a default rule
+        $is_default_rule = ($rule_id == 1 || $existing_rule->priority == -1 || (isset($existing_rule->is_default) && $existing_rule->is_default == 1));
+        error_log('IntelliSend: Is default rule: ' . ($is_default_rule ? 'true' : 'false'));
 
         // For non-default rules, validate subject patterns
         if (!$is_default_rule && empty($formData['subject_patterns'])) {
+            error_log('IntelliSend: Subject patterns required for non-default rule');
             wp_send_json_error('At least one pattern is required.');
             return;
         }
+
+        // Handle pattern type with case-insensitive validation
+        $valid_pattern_types = array('wildcard', 'starts_with', 'contains', 'ends_with', 'regex');
+        $pattern_type = isset($formData['pattern_type']) ? strtolower(sanitize_text_field($formData['pattern_type'])) : 'wildcard';
+        if (!in_array($pattern_type, $valid_pattern_types)) {
+            $pattern_type = 'wildcard';
+        }
+        error_log('IntelliSend: Pattern type after validation: ' . $pattern_type);
+        error_log('IntelliSend: Valid pattern types: ' . print_r($valid_pattern_types, true));
+        error_log('IntelliSend: Original pattern_type from form: ' . (isset($formData['pattern_type']) ? $formData['pattern_type'] : 'NOT_SET'));
 
         // Prepare rule data object
         $rule = new stdClass();
         $rule->id = $rule_id;
         $rule->name = sanitize_text_field($formData['name']);
         $rule->default_provider_name = sanitize_text_field($formData['default_provider_name']);
+        $rule->pattern_type = $pattern_type;
         $rule->recipients = isset($formData['recipients']) ? sanitize_textarea_field($formData['recipients']) : $existing_rule->recipients;
         $rule->enabled = isset($formData['enabled']) ? absint($formData['enabled']) : 1;
         $rule->anti_spam_enabled = isset($formData['anti_spam_enabled']) ? absint($formData['anti_spam_enabled']) : 1;
 
         // Handle subject patterns and priority for default vs regular rules
         if ($is_default_rule) {
-            // For default rule, keep fixed values
+            // For default rule, keep fixed values but allow pattern type to be updated
             $rule->subject_patterns = '*';
             $rule->priority = -1;
+            error_log('IntelliSend: Default rule - using fixed patterns and priority, but allowing pattern_type: ' . $rule->pattern_type);
         } else {
             // For regular rules, use provided values
             $rule->subject_patterns = sanitize_textarea_field($formData['subject_patterns']);
             $rule->priority = isset($formData['priority']) ? intval($formData['priority']) : $existing_rule->priority;
+            error_log('IntelliSend: Regular rule - using provided patterns: ' . $rule->subject_patterns . ', pattern_type: ' . $rule->pattern_type);
+        }
+
+        error_log('IntelliSend: Final rule object: ' . print_r($rule, true));
+        error_log('IntelliSend: Rule pattern_type specifically: "' . $rule->pattern_type . '"');
+        error_log('IntelliSend: Rule pattern_type type: ' . gettype($rule->pattern_type));
+
+        // Check the current pattern_type in database BEFORE update
+        global $wpdb;
+        $table = $wpdb->prefix . 'intellisend_routing';
+        $current_db_rule = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $rule_id));
+        error_log('IntelliSend: Current rule in DB BEFORE update: ' . print_r($current_db_rule, true));
+
+        // Verify database classes are available
+        if (!class_exists('IntelliSend_Database')) {
+            error_log('IntelliSend: IntelliSend_Database class not found');
+            wp_send_json_error('Database class not available.');
+            return;
+        }
+
+        if (!method_exists('IntelliSend_Database', 'update_routing_rule')) {
+            error_log('IntelliSend: update_routing_rule method not found');
+            wp_send_json_error('Database method not available.');
+            return;
         }
 
         // Update rule
+        error_log('IntelliSend: Calling IntelliSend_Database::update_routing_rule');
         $result = IntelliSend_Database::update_routing_rule($rule);
+        error_log('IntelliSend: Update result: ' . var_export($result, true));
+
+        // Check the pattern_type in database AFTER update
+        $updated_db_rule = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $rule_id));
+        error_log('IntelliSend: Updated rule in DB AFTER update: ' . print_r($updated_db_rule, true));
+        error_log('IntelliSend: Pattern type changed from "' . ($current_db_rule ? $current_db_rule->pattern_type : 'NULL') . '" to "' . ($updated_db_rule ? $updated_db_rule->pattern_type : 'NULL') . '"');
+
         if ($result === false) {
             error_log('IntelliSend: Database error in handle_update_routing_rule');
+            
+            // Get additional debugging info
+            if ($wpdb->last_error) {
+                error_log('IntelliSend: WordPress database error: ' . $wpdb->last_error);
+                error_log('IntelliSend: Last query: ' . $wpdb->last_query);
+            }
+            
             wp_send_json_error('Failed to update routing rule. Database operation failed.');
             return;
         }
 
-        // Send success response
+        error_log('IntelliSend: Rule updated successfully');
+        error_log('=== INTELLISEND UPDATE ROUTING RULE SUCCESS ===');
+
         wp_send_json_success('Routing rule updated successfully.');
     }
 

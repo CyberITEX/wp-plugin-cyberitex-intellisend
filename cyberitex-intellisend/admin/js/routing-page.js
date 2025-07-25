@@ -41,11 +41,52 @@
 
             // Form validation events
             $(document).on('input', '.rule-name, .rule-patterns, .rule-priority', this.handleFieldValidation.bind(this));
-            $(document).on('change', '.rule-provider', this.handleProviderChange.bind(this));
+            $(document).on('change', '.rule-provider, .rule-pattern-type', this.handleProviderChange.bind(this));
             
             // Recipient tag events
             $(document).on('keypress', '.rule-recipients-input', this.handleRecipientInput.bind(this));
             $(document).on('click', '.remove-recipient', this.handleRemoveRecipient.bind(this));
+            
+            // Pattern type change event
+            $(document).on('change', '.rule-pattern-type', this.handlePatternTypeChange.bind(this));
+        },
+
+        /**
+         * Handle pattern type change
+         */
+        handlePatternTypeChange(e) {
+            const $select = $(e.target);
+            const $row = $select.closest('.rule-row');
+            const patternType = $select.val().toLowerCase(); // Make case-insensitive
+            
+            // Update the placeholder text for patterns based on pattern type
+            const $patternsField = $row.find('.rule-patterns');
+            let placeholder = '';
+            
+            switch (patternType) {
+                case 'wildcard':
+                    placeholder = 'e.g. newsletter*, *urgent*, order*confirmation';
+                    break;
+                case 'starts_with':
+                    placeholder = 'e.g. newsletter, urgent, order';
+                    break;
+                case 'contains':
+                    placeholder = 'e.g. urgent, newsletter, confirmation';
+                    break;
+                case 'ends_with':
+                    placeholder = 'e.g. confirmation, receipt, notification';
+                    break;
+                case 'regex':
+                    placeholder = 'e.g. ^newsletter.*$, \\b(urgent|important)\\b';
+                    break;
+                default:
+                    placeholder = 'e.g. newsletter*, *urgent*, order*';
+            }
+            
+            $patternsField.attr('placeholder', placeholder);
+            
+            // Clear validation errors
+            this.clearFieldError($select);
         },
 
         /**
@@ -348,6 +389,7 @@
             const originalValues = {
                 name: $row.find('.rule-name').val() || '',
                 patterns: $row.find('.rule-patterns').val() || '',
+                patternType: $row.find('.rule-pattern-type').val() || 'wildcard',
                 provider: $row.find('.rule-provider').val() || '',
                 recipients: $row.find('.rule-recipients').val() || '',
                 enabled: $row.find('.rule-enabled').val() || '1',
@@ -367,6 +409,7 @@
 
             $row.find('.rule-name').val(original.name);
             $row.find('.rule-patterns').val(original.patterns);
+            $row.find('.rule-pattern-type').val(original.patternType);
             $row.find('.rule-provider').val(original.provider);
             $row.find('.rule-recipients').val(original.recipients);
             $row.find('.rule-enabled').val(original.enabled);
@@ -383,6 +426,11 @@
             $row.find('.rule-patterns-display').text($row.find('.rule-patterns').val().trim());
             $row.find('.rule-provider-display').text($row.find('.rule-provider option:selected').text());
             $row.find('.rule-recipients-display').text($row.find('.rule-recipients').val().trim());
+            
+            // Update pattern type display
+            const patternTypeValue = $row.find('.rule-pattern-type').val();
+            const patternTypeText = $row.find('.rule-pattern-type option:selected').text();
+            $row.find('[data-field="pattern_type"] .view-mode').text(patternTypeText);
             
             // Update status displays
             this.updateStatusDisplay($row, '.rule-enabled', '.rule-enabled-display');
@@ -432,6 +480,15 @@
                 // Regular rules need patterns
                 if (!this.validateField($row.find('.rule-patterns'), 'At least one pattern is required')) {
                     isValid = false;
+                } else {
+                    // Validate pattern format based on pattern type
+                    const patternType = $row.find('.rule-pattern-type').val();
+                    const patterns = $row.find('.rule-patterns').val().trim();
+                    
+                    if (!this.validatePatternFormat(patterns, patternType)) {
+                        this.showFieldError($row.find('.rule-patterns'), this.getPatternFormatError(patternType));
+                        isValid = false;
+                    }
                 }
 
                 // Validate priority for regular rules
@@ -442,12 +499,76 @@
                     isValid = false;
                 }
             } else {
-                // Default rule validation - patterns might be fixed or optional
+                // Default rule validation - patterns and priority handled by backend
                 console.log('Validating default rule - patterns and priority handled by backend');
             }
 
             console.log('Validation result:', isValid);
             return isValid;
+        },
+
+        /**
+         * Validate pattern format based on pattern type
+         */
+        validatePatternFormat(patterns, patternType) {
+            if (!patterns) return false;
+            
+            const patternList = patterns.split(',').map(p => p.trim()).filter(p => p);
+            const lowerPatternType = patternType.toLowerCase(); // Make case-insensitive
+            
+            switch (lowerPatternType) {
+                case 'wildcard':
+                    // Wildcard patterns: any non-empty string is valid, but should contain * for wildcards
+                    return patternList.length > 0;
+                    
+                case 'starts_with':
+                    // Starts with patterns: any non-empty string without wildcards
+                    return patternList.length > 0 && patternList.every(pattern => !pattern.includes('*'));
+                    
+                case 'contains':
+                    // Contains patterns: any non-empty string without wildcards
+                    return patternList.length > 0 && patternList.every(pattern => !pattern.includes('*'));
+                    
+                case 'ends_with':
+                    // Ends with patterns: any non-empty string without wildcards
+                    return patternList.length > 0 && patternList.every(pattern => !pattern.includes('*'));
+                    
+                case 'regex':
+                    // Regex patterns: validate that each pattern is a valid regex
+                    return patternList.length > 0 && patternList.every(pattern => {
+                        try {
+                            new RegExp(pattern);
+                            return true;
+                        } catch (e) {
+                            return false;
+                        }
+                    });
+                    
+                default:
+                    return true;
+            }
+        },
+
+        /**
+         * Get pattern format error message
+         */
+        getPatternFormatError(patternType) {
+            const lowerPatternType = patternType.toLowerCase(); // Make case-insensitive
+            
+            switch (lowerPatternType) {
+                case 'wildcard':
+                    return 'Enter patterns separated by commas. Use * for wildcards (e.g., newsletter*, *urgent*)';
+                case 'starts_with':
+                    return 'Enter text that emails should start with, separated by commas (e.g., newsletter, urgent)';
+                case 'contains':
+                    return 'Enter text that emails should contain, separated by commas (e.g., urgent, newsletter)';
+                case 'ends_with':
+                    return 'Enter text that emails should end with, separated by commas (e.g., confirmation, receipt)';
+                case 'regex':
+                    return 'Enter valid regular expressions separated by commas (e.g., ^newsletter.*$, \\b(urgent|important)\\b)';
+                default:
+                    return 'Invalid pattern format';
+            }
         },
 
         /**
@@ -502,37 +623,80 @@
          * Save an existing rule
          */
         saveExistingRule($row) {
-            console.log('Saving existing rule...');
+            console.log('=== SAVING EXISTING RULE ===');
             const ruleId = $row.data('id');
+            console.log('Rule ID:', ruleId);
+            
+            // Debug: Log all form field values before serialization
+            console.log('Form field values before serialization:');
+            console.log('  rule-name:', $row.find('.rule-name').val());
+            console.log('  rule-patterns:', $row.find('.rule-patterns').val());
+            console.log('  rule-pattern-type:', $row.find('.rule-pattern-type').val());
+            console.log('  rule-provider:', $row.find('.rule-provider').val());
+            console.log('  rule-recipients:', $row.find('.rule-recipients').val());
+            console.log('  rule-priority:', $row.find('.rule-priority').val());
+            console.log('  rule-enabled:', $row.find('.rule-enabled').val());
+            console.log('  rule-antispam:', $row.find('.rule-antispam').val());
             
             // Use the serialized format for existing rules too
             const formDataString = this.createSerializedFormData($row, ruleId);
+            console.log('Serialized form data:', formDataString);
+            
+            // Debug: Log AJAX request details
+            const ajaxData = {
+                action: 'intellisend_update_routing_rule',
+                nonce: intellisendData.nonce,
+                formData: formDataString
+            };
+            
+            console.log('AJAX Request Details:');
+            console.log('  URL:', intellisendData.ajax_url);  // Fixed: was ajaxUrl, should be ajax_url
+            console.log('  Data:', ajaxData);
+            console.log('  Available intellisendData:', intellisendData);
             
             this.showLoading();
             
             $.ajax({
-                url: intellisendData.ajax_url,
+                url: intellisendData.ajax_url,  // Fixed: was ajaxUrl, should be ajax_url
                 type: 'POST',
-                data: {
-                    action: 'intellisend_update_routing_rule',
-                    nonce: intellisendData.nonce,
-                    formData: formDataString
-                },
+                data: ajaxData,
                 success: (response) => {
-                    console.log('Update response:', response);
+                    console.log('=== UPDATE SUCCESS RESPONSE ===');
+                    console.log('Full response:', response);
+                    console.log('Response type:', typeof response);
+                    console.log('Response success:', response.success);
+                    console.log('Response data:', response.data);
+                    
                     if (response.success) {
                         this.exitEditMode($row, false);
                         this.showSuccess('Routing rule updated successfully');
                     } else {
+                        console.error('=== UPDATE RULE FAILED ===');
+                        console.error('Error message:', response.data);
+                        console.error('Full error response:', response);
                         this.showError(response.data || 'Failed to update routing rule');
-                        console.error('Update Error:', response);
                     }
                 },
                 error: (xhr, status, error) => {
-                    console.error('AJAX Error:', xhr, status, error);
+                    console.error('=== AJAX ERROR ===');
+                    console.error('XHR object:', xhr);
+                    console.error('Status:', status);
+                    console.error('Error:', error);
+                    console.error('Response Text:', xhr.responseText);
+                    console.error('Status Code:', xhr.status);
+                    
+                    // Try to parse the response as JSON
+                    try {
+                        const errorResponse = JSON.parse(xhr.responseText);
+                        console.error('Parsed error response:', errorResponse);
+                    } catch (e) {
+                        console.error('Could not parse error response as JSON');
+                    }
+                    
                     this.showError(`Network error: ${error || 'Unknown error'}`);
                 },
                 complete: () => {
+                    console.log('=== UPDATE AJAX COMPLETE ===');
                     this.hideLoading();
                 }
             });
@@ -549,6 +713,7 @@
             console.log('Form field values:');
             console.log('  rule-name:', $row.find('.rule-name').val());
             console.log('  rule-patterns:', $row.find('.rule-patterns').val());
+            console.log('  rule-pattern-type:', $row.find('.rule-pattern-type').val());
             console.log('  rule-provider:', $row.find('.rule-provider').val());
             console.log('  rule-recipients:', $row.find('.rule-recipients').val());
             console.log('  rule-priority:', $row.find('.rule-priority').val());
@@ -566,13 +731,13 @@
             };
             
             console.log('AJAX Request Data:', ajaxData);
-            console.log('AJAX URL:', intellisendData.ajax_url); // Fixed property name
+            console.log('AJAX URL:', intellisendData.ajax_url);  // Fixed: was ajaxUrl, should be ajax_url
             console.log('Available intellisendData:', intellisendData);
             
             this.showLoading();
             
             $.ajax({
-                url: intellisendData.ajax_url, // Fixed: was ajaxUrl, should be ajax_url
+                url: intellisendData.ajax_url,  // Fixed: was ajaxUrl, should be ajax_url
                 type: 'POST',
                 data: ajaxData,
                 success: (response) => {
@@ -631,6 +796,7 @@
             const ruleProvider = $row.find('.rule-provider').val();
             const ruleRecipients = $row.find('.rule-recipients').val().trim();
             const rulePatterns = $row.find('.rule-patterns').val().trim();
+            const rulePatternType = $row.find('.rule-pattern-type').val() || 'wildcard';
             const rulePriority = $row.find('.rule-priority').val();
             const ruleEnabled = $row.find('.rule-enabled').val();
             const ruleAntispam = $row.find('.rule-antispam').val();
@@ -640,6 +806,7 @@
             console.log('  ruleProvider:', ruleProvider);
             console.log('  ruleRecipients:', ruleRecipients);
             console.log('  rulePatterns:', rulePatterns);
+            console.log('  rulePatternType:', rulePatternType);
             console.log('  rulePriority:', rulePriority);
             console.log('  ruleEnabled:', ruleEnabled);
             console.log('  ruleAntispam:', ruleAntispam);
@@ -648,6 +815,7 @@
             $form.append(`<input type="hidden" name="name" value="${ruleName}">`);
             $form.append(`<input type="hidden" name="default_provider_name" value="${ruleProvider}">`);
             $form.append(`<input type="hidden" name="recipients" value="${ruleRecipients}">`);
+            $form.append(`<input type="hidden" name="pattern_type" value="${rulePatternType}">`);
             
             // Add rule ID for updates
             if (ruleId) {
@@ -690,6 +858,7 @@
                 name: $row.find('.rule-name').val().trim(),
                 default_provider_name: $row.find('.rule-provider').val(),
                 recipients: $row.find('.rule-recipients').val().trim(),
+                pattern_type: $row.find('.rule-pattern-type').val() || 'wildcard',
                 enabled: $row.find('.rule-enabled').val() === '1' ? 1 : 0,
                 anti_spam_enabled: $row.find('.rule-antispam').val() === '1' ? 1 : 0
             };
@@ -719,7 +888,7 @@
             this.showLoading();
             
             $.ajax({
-                url: intellisendData.ajax_url,
+                url: intellisendData.ajax_url,  // Fixed: was ajaxUrl, should be ajax_url
                 type: 'POST',
                 data: {
                     action: action,
@@ -762,7 +931,7 @@
             this.showLoading();
             
             $.ajax({
-                url: intellisendData.ajax_url,
+                url: intellisendData.ajax_url,  // Fixed: was ajaxUrl, should be ajax_url
                 type: 'POST',
                 data: {
                     action: 'intellisend_delete_routing_rule',
@@ -806,6 +975,7 @@
             // Copy values from the source row
             $newRow.find('.rule-name').val($row.find('.rule-name').val() + ' (Copy)');
             $newRow.find('.rule-patterns').val($row.find('.rule-patterns').val());
+            $newRow.find('.rule-pattern-type').val($row.find('.rule-pattern-type').val());
             $newRow.find('.rule-provider').val($row.find('.rule-provider').val());
             $newRow.find('.rule-priority').val($row.find('.rule-priority').val());
             $newRow.find('.rule-enabled').val($row.find('.rule-enabled').val());
@@ -825,6 +995,9 @@
                     }
                 });
             }
+            
+            // Trigger pattern type change to update placeholder
+            $newRow.find('.rule-pattern-type').trigger('change');
         },
 
         /**

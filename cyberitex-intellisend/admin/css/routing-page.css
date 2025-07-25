@@ -531,3 +531,69 @@
         border-color: #50575e;
     }
 }
+
+
+
+
+/* Pattern Type column styling */
+.intellisend-table .col-pattern-type {
+    width: 12%;
+    min-width: 120px;
+}
+
+.intellisend-table .rule-pattern-type {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.intellisend-table .rule-pattern-type:focus {
+    border-color: #0073aa;
+    box-shadow: 0 0 0 1px #0073aa;
+}
+
+/* Pattern type display in view mode */
+.intellisend-table td[data-field="pattern_type"] .view-mode {
+    font-weight: 500;
+    color: #555;
+}
+
+/* Pattern validation error styling */
+.rule-patterns.has-error {
+    border-color: #dc3232 !important;
+    box-shadow: 0 0 0 1px #dc3232 !important;
+}
+
+.field-error {
+    display: block;
+    color: #dc3232;
+    font-size: 12px;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Responsive adjustments for pattern type column */
+@media screen and (max-width: 1200px) {
+    .intellisend-table .col-pattern-type {
+        width: 10%;
+        min-width: 100px;
+    }
+}
+
+@media screen and (max-width: 782px) {
+    .intellisend-table .col-pattern-type {
+        display: none;
+    }
+    
+    /* Show pattern type in mobile view differently */
+    .intellisend-table tr:before {
+        content: "";
+    }
+    
+    .intellisend-table td[data-field="pattern_type"]:before {
+        content: "Pattern Type: ";
+        font-weight: bold;
+    }
+}

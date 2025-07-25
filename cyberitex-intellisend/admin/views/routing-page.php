@@ -50,6 +50,7 @@ function intellisend_render_routing_page_content()
                             <tr>
                                 <th class="col-name"><?php echo esc_html__('Name', 'intellisend'); ?></th>
                                 <th class="col-pattern"><?php echo esc_html__('Pattern', 'intellisend'); ?></th>
+                                <th class="col-pattern-type"><?php echo esc_html__('Pattern Type', 'intellisend'); ?></th>
                                 <th class="col-provider"><?php echo esc_html__('Provider', 'intellisend'); ?></th>
                                 <th class="col-recipients"><?php echo esc_html__('Recipients', 'intellisend'); ?></th>
                                 <th class="col-priority"><?php echo esc_html__('Priority', 'intellisend'); ?></th>
@@ -61,7 +62,7 @@ function intellisend_render_routing_page_content()
                         <tbody>
                             <?php if (empty($routing_rules)) : ?>
                                 <tr>
-                                    <td colspan="8"><?php echo esc_html__('No routing rules found. Add your first rule below.', 'intellisend'); ?></td>
+                                    <td colspan="9"><?php echo esc_html__('No routing rules found. Add your first rule below.', 'intellisend'); ?></td>
                                 </tr>
                             <?php else : ?>
                                 <?php foreach ($routing_rules as $rule) : 
@@ -74,6 +75,29 @@ function intellisend_render_routing_page_content()
                                             $provider_display_name = ucfirst($provider->name);
                                             break;
                                         }
+                                    }
+                                    
+                                    // Get pattern type display
+                                    $pattern_type = isset($rule->pattern_type) ? strtolower($rule->pattern_type) : 'wildcard';
+                                    $pattern_type_display = '';
+                                    switch ($pattern_type) {
+                                        case 'wildcard':
+                                            $pattern_type_display = esc_html__('Wildcard', 'intellisend');
+                                            break;
+                                        case 'starts_with':
+                                            $pattern_type_display = esc_html__('Starts With', 'intellisend');
+                                            break;
+                                        case 'contains':
+                                            $pattern_type_display = esc_html__('Contains', 'intellisend');
+                                            break;
+                                        case 'ends_with':
+                                            $pattern_type_display = esc_html__('Ends With', 'intellisend');
+                                            break;
+                                        case 'regex':
+                                            $pattern_type_display = esc_html__('Regular Expression', 'intellisend');
+                                            break;
+                                        default:
+                                            $pattern_type_display = esc_html__('Wildcard', 'intellisend');
                                     }
                                 ?>
                                     <tr class="rule-row" data-id="<?php echo esc_attr($rule->id); ?>" data-is-default="<?php echo $is_default_rule ? '1' : '0'; ?>">
@@ -92,6 +116,26 @@ function intellisend_render_routing_page_content()
                                                 <textarea class="edit-mode rule-patterns" style="display:none;" readonly><?php echo esc_textarea($rule->subject_patterns); ?></textarea>
                                             <?php else : ?>
                                                 <textarea class="edit-mode rule-patterns" style="display:none;"><?php echo esc_textarea($rule->subject_patterns); ?></textarea>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="editable" data-field="pattern_type">
+                                            <span class="view-mode"><?php echo $pattern_type_display; ?></span>
+                                            <?php if ($is_default_rule) : ?>
+                                                <select class="edit-mode rule-pattern-type" style="display:none;" disabled>
+                                                    <option value="wildcard" <?php selected($pattern_type, 'wildcard'); ?>><?php echo esc_html__('Wildcard', 'intellisend'); ?></option>
+                                                    <option value="starts_with" <?php selected($pattern_type, 'starts_with'); ?>><?php echo esc_html__('Starts With', 'intellisend'); ?></option>
+                                                    <option value="contains" <?php selected($pattern_type, 'contains'); ?>><?php echo esc_html__('Contains', 'intellisend'); ?></option>
+                                                    <option value="ends_with" <?php selected($pattern_type, 'ends_with'); ?>><?php echo esc_html__('Ends With', 'intellisend'); ?></option>
+                                                    <option value="regex" <?php selected($pattern_type, 'regex'); ?>><?php echo esc_html__('Regular Expression', 'intellisend'); ?></option>
+                                                </select>
+                                            <?php else : ?>
+                                                <select class="edit-mode rule-pattern-type" style="display:none;">
+                                                    <option value="wildcard" <?php selected($pattern_type, 'wildcard'); ?>><?php echo esc_html__('Wildcard', 'intellisend'); ?></option>
+                                                    <option value="starts_with" <?php selected($pattern_type, 'starts_with'); ?>><?php echo esc_html__('Starts With', 'intellisend'); ?></option>
+                                                    <option value="contains" <?php selected($pattern_type, 'contains'); ?>><?php echo esc_html__('Contains', 'intellisend'); ?></option>
+                                                    <option value="ends_with" <?php selected($pattern_type, 'ends_with'); ?>><?php echo esc_html__('Ends With', 'intellisend'); ?></option>
+                                                    <option value="regex" <?php selected($pattern_type, 'regex'); ?>><?php echo esc_html__('Regular Expression', 'intellisend'); ?></option>
+                                                </select>
                                             <?php endif; ?>
                                         </td>
                                         <td class="editable" data-field="provider">
@@ -228,6 +272,16 @@ function intellisend_render_routing_page_content()
                 <span class="view-mode"></span>
                 <textarea class="edit-mode rule-patterns" placeholder="<?php echo esc_attr__('e.g. *@example.com, newsletter*', 'intellisend'); ?>"></textarea>
             </td>
+            <td class="editable" data-field="pattern_type">
+                <span class="view-mode"></span>
+                <select class="edit-mode rule-pattern-type">
+                    <option value="wildcard" selected><?php echo esc_html__('Wildcard', 'intellisend'); ?></option>
+                    <option value="starts_with"><?php echo esc_html__('Starts With', 'intellisend'); ?></option>
+                    <option value="contains"><?php echo esc_html__('Contains', 'intellisend'); ?></option>
+                    <option value="ends_with"><?php echo esc_html__('Ends With', 'intellisend'); ?></option>
+                    <option value="regex"><?php echo esc_html__('Regular Expression', 'intellisend'); ?></option>
+                </select>
+            </td>
             <td class="editable" data-field="provider">
                 <span class="view-mode"></span>
                 <select class="edit-mode rule-provider">
@@ -304,7 +358,7 @@ add_action('admin_enqueue_scripts', function($hook) {
             'intellisendData',
             array(
                 'nonce' => wp_create_nonce('intellisend_routing_nonce'),
-                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'ajax_url' => admin_url('admin-ajax.php'),  // Fixed: was ajaxUrl, should be ajax_url
                 'strings' => array(
                     'saveSuccess' => __('Routing rule saved successfully.', 'intellisend'),
                     'saveFailed' => __('Failed to save routing rule.', 'intellisend'),
