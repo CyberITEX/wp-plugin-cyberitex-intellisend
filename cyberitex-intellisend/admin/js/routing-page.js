@@ -381,20 +381,28 @@
             const ruleId = $row.data('id');
             const isDefault = $row.data('is-default') == 1;
             
-            // Prepare the data
-            const formData = {
-                id: ruleId,
-                name: $row.find('.rule-name').val().trim(),
-                subject_patterns: $row.find('.rule-patterns').val().trim(),
-                default_provider_name: $row.find('.rule-provider').val(),
-                recipients: $row.find('.rule-recipients').val(),
-                enabled: $row.find('.rule-enabled').val(),
-                anti_spam_enabled: $row.find('.rule-antispam').val()
-            };
+            // Create a form element to properly serialize the data
+            const $form = $('<form></form>');
+            
+            // Add form fields with the correct property names expected by the backend
+            $form.append('<input type="hidden" name="rule_id" value="' + ruleId + '">');
+            $form.append('<input type="hidden" name="rule_name" value="' + $row.find('.rule-name').val().trim() + '">');
+            $form.append('<input type="hidden" name="rule_patterns" value="' + $row.find('.rule-patterns').val().trim() + '">');
+            $form.append('<input type="hidden" name="rule_provider" value="' + $row.find('.rule-provider').val() + '">');
+            $form.append('<input type="hidden" name="rule_recipients" value="' + $row.find('.rule-recipients').val() + '">');
+            
+            // Handle checkboxes correctly
+            if ($row.find('.rule-enabled').val() === '1') {
+                $form.append('<input type="hidden" name="rule_enabled" value="1">');
+            }
+            
+            if ($row.find('.rule-antispam').val() === '1') {
+                $form.append('<input type="hidden" name="rule_antispam" value="1">');
+            }
             
             // Add priority if not default rule
             if (!isDefault) {
-                formData.priority = $row.find('.rule-priority').val();
+                $form.append('<input type="hidden" name="rule_priority" value="' + $row.find('.rule-priority').val() + '">');
             }
             
             // Show loading
@@ -407,7 +415,7 @@
                 data: {
                     action: 'intellisend_update_routing_rule',
                     nonce: intellisendData.nonce,
-                    formData: formData
+                    formData: $form.serialize()
                 },
                 success: function(response) {
                     if (response.success) {
@@ -435,14 +443,24 @@
         saveNewRule: function($row) {
             const self = this;
             
-            // Prepare the data for new rule
-            const formData = 'name=' + encodeURIComponent($row.find('.rule-name').val().trim()) + 
-                           '&subject_patterns=' + encodeURIComponent($row.find('.rule-patterns').val().trim()) +
-                           '&default_provider_name=' + encodeURIComponent($row.find('.rule-provider').val()) +
-                           '&recipients=' + encodeURIComponent($row.find('.rule-recipients').val()) +
-                           '&priority=' + encodeURIComponent($row.find('.rule-priority').val()) +
-                           '&enabled=' + encodeURIComponent($row.find('.rule-enabled').val()) +
-                           '&anti_spam_enabled=' + encodeURIComponent($row.find('.rule-antispam').val());
+            // Create a form element to properly serialize the data
+            const $form = $('<form></form>');
+            
+            // Add form fields with the correct property names expected by the backend
+            $form.append('<input type="hidden" name="rule_name" value="' + $row.find('.rule-name').val().trim() + '">');
+            $form.append('<input type="hidden" name="rule_patterns" value="' + $row.find('.rule-patterns').val().trim() + '">');
+            $form.append('<input type="hidden" name="rule_provider" value="' + $row.find('.rule-provider').val() + '">');
+            $form.append('<input type="hidden" name="rule_recipients" value="' + $row.find('.rule-recipients').val() + '">');
+            $form.append('<input type="hidden" name="rule_priority" value="' + $row.find('.rule-priority').val() + '">');
+            
+            // Handle checkboxes correctly
+            if ($row.find('.rule-enabled').val() === '1') {
+                $form.append('<input type="hidden" name="rule_enabled" value="1">');
+            }
+            
+            if ($row.find('.rule-antispam').val() === '1') {
+                $form.append('<input type="hidden" name="rule_antispam" value="1">');
+            }
             
             // Show loading
             this.showLoading();
@@ -454,7 +472,7 @@
                 data: {
                     action: 'intellisend_add_routing_rule',
                     nonce: intellisendData.nonce,
-                    formData: formData
+                    formData: $form.serialize()
                 },
                 success: function(response) {
                     if (response.success) {

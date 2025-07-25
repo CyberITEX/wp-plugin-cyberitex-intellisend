@@ -529,24 +529,30 @@ class IntelliSend_Ajax
     {
         // Check nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
+            error_log('IntelliSend: Nonce validation failed in handle_add_routing_rule');
             wp_send_json_error('Security check failed.');
             return;
         }
 
         // Check capabilities
         if (!current_user_can('manage_options')) {
+            error_log('IntelliSend: Permission check failed in handle_add_routing_rule');
             wp_send_json_error('You do not have permission to perform this action.');
             return;
         }
 
         // Get form data
         if (!isset($_POST['formData'])) {
+            error_log('IntelliSend: No form data provided in handle_add_routing_rule');
             wp_send_json_error('Invalid form data.');
             return;
         }
 
         $formData = array();
         parse_str($_POST['formData'], $formData);
+
+        // Log the received data for debugging
+        error_log('IntelliSend: Add routing rule data: ' . print_r($formData, true));
 
         // Validate required fields
         if (empty($formData['name'])) {
@@ -569,7 +575,7 @@ class IntelliSend_Ajax
         $rule->name = sanitize_text_field($formData['name']);
         $rule->default_provider_name = sanitize_text_field($formData['default_provider_name']);
         $rule->subject_patterns = sanitize_textarea_field($formData['subject_patterns']);
-        $rule->recipients = isset($formData['recipients']) ? sanitize_textarea_field($formData['recipients']) : get_option('admin_email');
+        $rule->recipients = isset($formData['recipients']) && !empty($formData['recipients']) ? sanitize_textarea_field($formData['recipients']) : get_option('admin_email');
         $rule->priority = isset($formData['priority']) ? intval($formData['priority']) : 10;
         $rule->enabled = isset($formData['enabled']) ? absint($formData['enabled']) : 1;
         $rule->anti_spam_enabled = isset($formData['anti_spam_enabled']) ? absint($formData['anti_spam_enabled']) : 1;
@@ -577,6 +583,7 @@ class IntelliSend_Ajax
         // Create the routing rule
         $result = IntelliSend_Database::create_routing_rule($rule);
         if (!$result) {
+            error_log('IntelliSend: Failed to create routing rule in database');
             wp_send_json_error('Failed to add routing rule. Database operation failed.');
             return;
         }
@@ -626,6 +633,9 @@ class IntelliSend_Ajax
 
         $formData = $_POST['formData'];
 
+        // Log the received data for debugging
+        error_log('IntelliSend: Update routing rule data: ' . print_r($formData, true));
+
         // Validate rule ID
         if (empty($formData['id'])) {
             wp_send_json_error('Rule ID is required.');
@@ -652,14 +662,15 @@ class IntelliSend_Ajax
         $rule_id = intval($formData['id']);
         $existing_rule = IntelliSend_Database::get_routing_rule($rule_id);
         if (!$existing_rule) {
+            error_log('IntelliSend: Rule not found with ID: ' . $rule_id);
             wp_send_json_error('Rule not found.');
             return;
         }
 
-        // Special handling for rule ID 1 (default rule)
-        $is_default_rule = ($rule_id == 1 || $existing_rule->priority == -1);
+        // Special handling for default rule
+        $is_default_rule = ($rule_id == 1 || $existing_rule->priority == -1 || $existing_rule->is_default == 1);
 
-        // Prepare rule data
+        // Prepare rule data object
         $rule = new stdClass();
         $rule->id = $rule_id;
         $rule->name = sanitize_text_field($formData['name']);
@@ -698,12 +709,14 @@ class IntelliSend_Ajax
     {
         // Check nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
+            error_log('IntelliSend: Nonce validation failed in handle_delete_routing_rule');
             wp_send_json_error('Security check failed.');
             return;
         }
 
         // Check capabilities
         if (!current_user_can('manage_options')) {
+            error_log('IntelliSend: Permission check failed in handle_delete_routing_rule');
             wp_send_json_error('You do not have permission to perform this action.');
             return;
         }
@@ -711,26 +724,15 @@ class IntelliSend_Ajax
         // Get rule ID
         $rule_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
         if (!$rule_id) {
+            error_log('IntelliSend: Invalid rule ID in handle_delete_routing_rule');
             wp_send_json_error('Invalid rule ID.');
-            return;
-        }
-
-        // Get rule data to check if it's the default rule
-        $rule = IntelliSend_Database::get_routing_rule($rule_id);
-        if (!$rule) {
-            wp_send_json_error('Rule not found.');
-            return;
-        }
-
-        // Don't allow deleting the default rule (rule ID 1 or priority -1)
-        if ($rule_id == 1 || $rule->priority == -1) {
-            wp_send_json_error('The default rule cannot be deleted.');
             return;
         }
 
         // Delete rule
         $result = IntelliSend_Database::delete_routing_rule($rule_id);
         if (!$result) {
+            error_log('IntelliSend: Failed to delete routing rule: ' . $rule_id);
             wp_send_json_error('Failed to delete routing rule. Database operation failed.');
             return;
         }
@@ -746,12 +748,14 @@ class IntelliSend_Ajax
     {
         // Check nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
+            error_log('IntelliSend: Nonce validation failed in handle_activate_routing_rule');
             wp_send_json_error('Security check failed.');
             return;
         }
 
         // Check capabilities
         if (!current_user_can('manage_options')) {
+            error_log('IntelliSend: Permission check failed in handle_activate_routing_rule');
             wp_send_json_error('You do not have permission to perform this action.');
             return;
         }
@@ -759,6 +763,7 @@ class IntelliSend_Ajax
         // Get rule ID
         $rule_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
         if (!$rule_id) {
+            error_log('IntelliSend: Invalid rule ID in handle_activate_routing_rule');
             wp_send_json_error('Invalid rule ID.');
             return;
         }
@@ -766,6 +771,7 @@ class IntelliSend_Ajax
         // Get rule data
         $rule = IntelliSend_Database::get_routing_rule($rule_id);
         if (!$rule) {
+            error_log('IntelliSend: Rule not found in handle_activate_routing_rule: ' . $rule_id);
             wp_send_json_error('Rule not found.');
             return;
         }
@@ -774,6 +780,7 @@ class IntelliSend_Ajax
         $rule->enabled = 1;
         $result = IntelliSend_Database::update_routing_rule($rule);
         if (!$result) {
+            error_log('IntelliSend: Failed to activate routing rule: ' . $rule_id);
             wp_send_json_error('Failed to activate routing rule. Database operation failed.');
             return;
         }
@@ -789,12 +796,14 @@ class IntelliSend_Ajax
     {
         // Check nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
+            error_log('IntelliSend: Nonce validation failed in handle_deactivate_routing_rule');
             wp_send_json_error('Security check failed.');
             return;
         }
 
         // Check capabilities
         if (!current_user_can('manage_options')) {
+            error_log('IntelliSend: Permission check failed in handle_deactivate_routing_rule');
             wp_send_json_error('You do not have permission to perform this action.');
             return;
         }
@@ -802,6 +811,7 @@ class IntelliSend_Ajax
         // Get rule ID
         $rule_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
         if (!$rule_id) {
+            error_log('IntelliSend: Invalid rule ID in handle_deactivate_routing_rule');
             wp_send_json_error('Invalid rule ID.');
             return;
         }
@@ -809,6 +819,7 @@ class IntelliSend_Ajax
         // Get rule data
         $rule = IntelliSend_Database::get_routing_rule($rule_id);
         if (!$rule) {
+            error_log('IntelliSend: Rule not found in handle_deactivate_routing_rule: ' . $rule_id);
             wp_send_json_error('Rule not found.');
             return;
         }
@@ -817,6 +828,7 @@ class IntelliSend_Ajax
         $rule->enabled = 0;
         $result = IntelliSend_Database::update_routing_rule($rule);
         if (!$result) {
+            error_log('IntelliSend: Failed to deactivate routing rule: ' . $rule_id);
             wp_send_json_error('Failed to deactivate routing rule. Database operation failed.');
             return;
         }
@@ -991,6 +1003,10 @@ class IntelliSend_Ajax
             return;
         }
 
+        // Check if there are any configured providers before this operation
+        $existing_configured_providers = IntelliSend_Database::get_providers(array('configured' => 1));
+        $had_configured_providers = !empty($existing_configured_providers);
+
         // Prepare provider data
         $provider_data = array(
             'name'         => sanitize_text_field($_POST['provider_name']),
@@ -999,7 +1015,7 @@ class IntelliSend_Ajax
             'encryption'   => 'tls', // Default to TLS
             'authRequired' => 1,     // Default to requiring authentication
             'username'     => sanitize_text_field($_POST['provider_username']),
-            'sender'       => !empty($_POST['provider_sender']) ? sanitize_text_field($_POST['provider_sender']) : sanitize_text_field($_POST['provider_username']), // Use username as default sender if not provided
+            'sender'       => !empty($_POST['provider_sender']) ? sanitize_text_field($_POST['provider_sender']) : sanitize_text_field($_POST['provider_username']),
             'password'     => $_POST['provider_password'], // Will be encrypted by the database class
             'configured'   => 1      // Mark as configured since all required fields are provided
         );
@@ -1018,15 +1034,42 @@ class IntelliSend_Ajax
         } else {
             // Add new provider
             $result = IntelliSend_Database::add_provider($provider_data);
-            if ($result && $set_as_default) {
-                // Set as default if requested
-                $settings = IntelliSend_Database::get_settings();
-                if ($settings) {
-                    $settings->defaultProviderName = $provider_data['name'];
-                    IntelliSend_Database::update_settings($settings);
+            $message = esc_html__('Provider added successfully.', 'intellisend');
+        }
+
+        // Handle default provider and routing rule updates
+        if ($result) {
+            $provider_name = $provider_data['name'];
+
+            // If this is the first configured provider or set as default, update settings and default routing rule
+            if (!$had_configured_providers || $set_as_default) {
+                // Update default provider in settings
+                $settings_update_data = array('defaultProviderName' => $provider_name);
+                IntelliSend_Database::update_settings($settings_update_data);
+
+                // Update the default routing rule to use this provider
+                $default_routing_rule = IntelliSend_Database::get_routing_rules(array('is_default' => 1));
+                if (!empty($default_routing_rule)) {
+                    $default_rule = $default_routing_rule[0]; // Get the first (should be only) default rule
+
+                    // Update the default rule's provider
+                    $rule_update = new stdClass();
+                    $rule_update->id = $default_rule->id;
+                    $rule_update->name = $default_rule->name;
+                    $rule_update->default_provider_name = $provider_name;
+                    $rule_update->subject_patterns = '*'; // Keep default pattern
+                    $rule_update->recipients = $default_rule->recipients;
+                    $rule_update->enabled = 1; // Ensure it's enabled
+                    $rule_update->anti_spam_enabled = $default_rule->anti_spam_enabled;
+                    $rule_update->priority = -1; // Keep default priority
+
+                    IntelliSend_Database::update_routing_rule($rule_update);
+
+                    if (!$had_configured_providers) {
+                        $message .= ' ' . esc_html__('Default routing rule has been updated to use this provider.', 'intellisend');
+                    }
                 }
             }
-            $message = esc_html__('Provider added successfully.', 'intellisend');
         }
 
         // Return response

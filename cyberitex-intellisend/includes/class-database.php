@@ -114,14 +114,15 @@ class IntelliSend_Database
 
 
     /**
- * Create routing table with updated structure
- */
-public static function create_routing_table() {
-    global $wpdb;
-    $charset_collate = $wpdb->get_charset_collate();
-    
-    $routing_table = $wpdb->prefix . 'intellisend_routing';
-    $sql = "CREATE TABLE IF NOT EXISTS $routing_table (
+     * Create routing table with updated structure
+     */
+    public static function create_routing_table()
+    {
+        global $wpdb;
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $routing_table = $wpdb->prefix . 'intellisend_routing';
+        $sql = "CREATE TABLE IF NOT EXISTS $routing_table (
         id bigint(20) NOT NULL AUTO_INCREMENT,
         name varchar(100) NOT NULL,
         pattern_type enum('wildcard','starts_with','contains','ends_with','regex') DEFAULT 'wildcard',
@@ -140,32 +141,32 @@ public static function create_routing_table() {
         KEY priority (priority),
         KEY is_default (is_default)
     ) $charset_collate;";
-    
-    if (!function_exists('dbDelta')) {
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        if (!function_exists('dbDelta')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+        dbDelta($sql);
+
+        // Insert default routing rule if the table is empty
+        $count = $wpdb->get_var("SELECT COUNT(*) FROM $routing_table");
+        if ($count == 0) {
+            $admin_email = get_option('admin_email');
+            $wpdb->insert(
+                $routing_table,
+                array(
+                    'name' => 'Default',
+                    'pattern_type' => 'wildcard',
+                    'subject_patterns' => '*',
+                    'default_provider_name' => 'other',
+                    'recipients' => $admin_email,
+                    'anti_spam_enabled' => 0,
+                    'enabled' => 1,
+                    'priority' => -1,
+                    'is_default' => 1,
+                )
+            );
+        }
     }
-    dbDelta($sql);
-    
-    // Insert default routing rule if the table is empty
-    $count = $wpdb->get_var("SELECT COUNT(*) FROM $routing_table");
-    if ($count == 0) {
-        $admin_email = get_option('admin_email');
-        $wpdb->insert(
-            $routing_table,
-            array(
-                'name' => 'Default',
-                'pattern_type' => 'wildcard',
-                'subject_patterns' => '*',
-                'default_provider_name' => 'other',
-                'recipients' => $admin_email,
-                'anti_spam_enabled' => 0,
-                'enabled' => 1,
-                'priority' => -1,
-                'is_default' => 1,
-            )
-        );
-    }
-}
 
 
     /**
@@ -433,7 +434,7 @@ public static function create_routing_table() {
     }
 
     /**
-     * Add a new provider
+     * Add a new provider and handle first provider logic
      * 
      * @param array $data Provider data
      * @return int|bool Provider ID on success, false on failure
@@ -454,6 +455,11 @@ public static function create_routing_table() {
         if ($existing) {
             return false;
         }
+
+        // Check if there are any configured providers before adding this one
+        $existing_configured = $wpdb->get_var(
+            "SELECT COUNT(*) FROM $table WHERE configured = 1"
+        );
 
         // Determine if the provider is configured
         $configured = 0;
@@ -490,11 +496,53 @@ public static function create_routing_table() {
             )
         );
 
-        return $result ? $wpdb->insert_id : false;
+        if ($result) {
+            $provider_id = $wpdb->insert_id;
+
+            // If this is the first configured provider, make it the default and update routing rule
+            if ($configured && $existing_configured == 0) {
+                $provider_name = sanitize_text_field($data['name']);
+
+                // Update settings to make this the default provider
+                $settings_table = $wpdb->prefix . 'intellisend_settings';
+                $settings = self::get_settings();
+
+                $settings_data = array('defaultProviderName' => $provider_name);
+
+                if ($settings) {
+                    $wpdb->update(
+                        $settings_table,
+                        $settings_data,
+                        array('id' => $settings->id)
+                    );
+                } else {
+                    $settings_data = array_merge($settings_data, array(
+                        'antiSpamEndPoint' => 'https://api.cyberitex.com/v1/tools/SpamCheck',
+                        'antiSpamApiKey' => '',
+                        'testRecipient' => get_option('admin_email'),
+                        'spamTestMessage' => 'This is a test spam message from IntelliSend.',
+                        'logsRetentionDays' => 365,
+                    ));
+                    $wpdb->insert($settings_table, $settings_data);
+                }
+
+                // Update the default routing rule to use this provider
+                $routing_table = $wpdb->prefix . 'intellisend_routing';
+                $wpdb->update(
+                    $routing_table,
+                    array('default_provider_name' => $provider_name),
+                    array('priority' => -1) // Default rule has priority -1
+                );
+            }
+
+            return $provider_id;
+        }
+
+        return false;
     }
 
     /**
-     * Update an existing provider
+     * Update provider and handle default routing rule updates
      * 
      * @param int $id Provider ID
      * @param array $data Provider data
@@ -732,7 +780,7 @@ public static function create_routing_table() {
      */
 
     /**
-     * Get all routing rules with optional filtering
+     * Get routing rules with additional filtering options
      * 
      * @param array $args Optional. Query arguments.
      * @return array Array of routing rule objects
@@ -759,7 +807,12 @@ public static function create_routing_table() {
 
             // Filter by provider
             if (isset($args['provider'])) {
-                $query .= $wpdb->prepare(" AND defaultProviderName = %s", $args['provider']);
+                $query .= $wpdb->prepare(" AND default_provider_name = %s", $args['provider']);
+            }
+
+            // Filter by default rule (is_default = 1 or priority = -1)
+            if (isset($args['is_default']) && $args['is_default']) {
+                $query .= " AND (is_default = 1 OR priority = -1)";
             }
         }
 
@@ -783,38 +836,39 @@ public static function create_routing_table() {
     }
 
     /**
- * Create routing rule with validation
- */
-public static function create_routing_rule($data) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'intellisend_routing';
+     * Create routing rule with validation
+     */
+    public static function create_routing_rule($data)
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'intellisend_routing';
 
-    // Validate required fields
-    if (empty($data->name) || empty($data->subject_patterns) || empty($data->default_provider_name)) {
-        return false;
-    }
+        // Validate required fields
+        if (empty($data->name) || empty($data->subject_patterns) || empty($data->default_provider_name)) {
+            error_log('IntelliSend: Missing required fields for routing rule creation');
+            return false;
+        }
 
-    // Validate pattern type
-    $valid_pattern_types = array('wildcard', 'starts_with', 'contains', 'ends_with', 'regex');
-    $pattern_type = isset($data->pattern_type) ? $data->pattern_type : 'wildcard';
-    if (!in_array($pattern_type, $valid_pattern_types)) {
-        $pattern_type = 'wildcard';
-    }
+        // Validate pattern type
+        $valid_pattern_types = array('wildcard', 'starts_with', 'contains', 'ends_with', 'regex');
+        $pattern_type = isset($data->pattern_type) ? $data->pattern_type : 'wildcard';
+        if (!in_array($pattern_type, $valid_pattern_types)) {
+            $pattern_type = 'wildcard';
+        }
 
-    // Don't allow creating another default rule
-    if (isset($data->is_default) && $data->is_default) {
-        return false;
-    }
+        // Don't allow creating another default rule
+        if (isset($data->is_default) && $data->is_default) {
+            error_log('IntelliSend: Attempted to create another default rule');
+            return false;
+        }
 
-    // Set default recipients to admin email if not specified
-    $recipients = isset($data->recipients) ? $data->recipients : '';
-    if (empty($recipients)) {
-        $recipients = get_option('admin_email');
-    }
+        // Set default recipients to admin email if not specified
+        $recipients = isset($data->recipients) ? $data->recipients : '';
+        if (empty($recipients)) {
+            $recipients = get_option('admin_email');
+        }
 
-    $result = $wpdb->insert(
-        $table,
-        array(
+        $insert_data = array(
             'name' => sanitize_text_field($data->name),
             'pattern_type' => $pattern_type,
             'subject_patterns' => sanitize_textarea_field($data->subject_patterns),
@@ -824,115 +878,149 @@ public static function create_routing_rule($data) {
             'enabled' => isset($data->enabled) ? absint($data->enabled) : 1,
             'priority' => isset($data->priority) ? intval($data->priority) : 100,
             'is_default' => 0,
-        )
-    );
+            'created_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql')
+        );
 
-    return $result ? $wpdb->insert_id : false;
-}
+        $result = $wpdb->insert($table, $insert_data);
 
-/**
- * Update routing rule with validation
- */
-public static function update_routing_rule($data) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'intellisend_routing';
-
-    // Ensure we have the ID
-    if (empty($data->id)) {
-        return false;
-    }
-
-    // Get existing rule
-    $existing_rule = self::get_routing_rule($data->id);
-    if (!$existing_rule) {
-        return false;
-    }
-
-    // Don't allow changing default rule's essential properties
-    $is_default_rule = $existing_rule->is_default == 1;
-    
-    $update_data = array();
-
-    // Basic fields (always updatable)
-    if (isset($data->name)) {
-        $update_data['name'] = sanitize_text_field($data->name);
-    }
-    
-    if (isset($data->default_provider_name)) {
-        $update_data['default_provider_name'] = sanitize_text_field($data->default_provider_name);
-    }
-    
-    if (isset($data->recipients)) {
-        $recipients = sanitize_textarea_field($data->recipients);
-        if (empty($recipients)) {
-            $recipients = get_option('admin_email');
+        if ($result === false) {
+            error_log('IntelliSend: Database error in create_routing_rule: ' . $wpdb->last_error);
+            error_log('IntelliSend: Insert data: ' . print_r($insert_data, true));
+            return false;
         }
-        $update_data['recipients'] = $recipients;
-    }
-    
-    if (isset($data->anti_spam_enabled)) {
-        $update_data['anti_spam_enabled'] = absint($data->anti_spam_enabled);
-    }
-    
-    if (isset($data->enabled)) {
-        $update_data['enabled'] = absint($data->enabled);
+
+        return $wpdb->insert_id;
     }
 
-    // For default rule, maintain fixed properties
-    if ($is_default_rule) {
-        $update_data['priority'] = -1;
-        $update_data['is_default'] = 1;
-        $update_data['pattern_type'] = 'wildcard';
-        $update_data['subject_patterns'] = '*';
-    } else {
-        // Non-default rules can have these updated
-        if (isset($data->subject_patterns)) {
-            $update_data['subject_patterns'] = sanitize_textarea_field($data->subject_patterns);
+
+    /**
+     * Update routing rule with validation
+     */
+    public static function update_routing_rule($data)
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'intellisend_routing';
+
+        // Ensure we have the ID
+        if (empty($data->id)) {
+            error_log('IntelliSend: No ID provided for routing rule update');
+            return false;
         }
-        
-        if (isset($data->pattern_type)) {
-            $valid_types = array('wildcard', 'starts_with', 'contains', 'ends_with', 'regex');
-            if (in_array($data->pattern_type, $valid_types)) {
-                $update_data['pattern_type'] = $data->pattern_type;
+
+        // Get existing rule
+        $existing_rule = self::get_routing_rule($data->id);
+        if (!$existing_rule) {
+            error_log('IntelliSend: Routing rule not found with ID: ' . $data->id);
+            return false;
+        }
+
+        // Don't allow changing default rule's essential properties
+        $is_default_rule = $existing_rule->is_default == 1 || $existing_rule->priority == -1;
+
+        $update_data = array();
+
+        // Basic fields (always updatable)
+        if (isset($data->name)) {
+            $update_data['name'] = sanitize_text_field($data->name);
+        }
+
+        if (isset($data->default_provider_name)) {
+            $update_data['default_provider_name'] = sanitize_text_field($data->default_provider_name);
+        }
+
+        if (isset($data->recipients)) {
+            $recipients = sanitize_textarea_field($data->recipients);
+            if (empty($recipients)) {
+                $recipients = get_option('admin_email');
+            }
+            $update_data['recipients'] = $recipients;
+        }
+
+        if (isset($data->anti_spam_enabled)) {
+            $update_data['anti_spam_enabled'] = absint($data->anti_spam_enabled);
+        }
+
+        if (isset($data->enabled)) {
+            $update_data['enabled'] = absint($data->enabled);
+        }
+
+        // For default rule, maintain fixed properties
+        if ($is_default_rule) {
+            $update_data['priority'] = -1;
+            $update_data['is_default'] = 1;
+            $update_data['pattern_type'] = 'wildcard';
+            $update_data['subject_patterns'] = '*';
+        } else {
+            // Non-default rules can have these updated
+            if (isset($data->subject_patterns)) {
+                $update_data['subject_patterns'] = sanitize_textarea_field($data->subject_patterns);
+            }
+
+            if (isset($data->pattern_type)) {
+                $valid_types = array('wildcard', 'starts_with', 'contains', 'ends_with', 'regex');
+                if (in_array($data->pattern_type, $valid_types)) {
+                    $update_data['pattern_type'] = $data->pattern_type;
+                }
+            }
+
+            if (isset($data->priority)) {
+                $update_data['priority'] = intval($data->priority);
             }
         }
-        
-        if (isset($data->priority)) {
-            $update_data['priority'] = intval($data->priority);
+
+        $update_data['updated_at'] = current_time('mysql');
+
+        // Perform the update
+        $result = $wpdb->update(
+            $table,
+            $update_data,
+            array('id' => $data->id),
+            null, // format for update data - let WordPress handle it
+            array('%d') // format for where clause
+        );
+
+        // Check for database errors
+        if ($result === false) {
+            error_log('IntelliSend: Database error in update_routing_rule: ' . $wpdb->last_error);
+            error_log('IntelliSend: Update data: ' . print_r($update_data, true));
+            return false;
         }
+
+        return true;
     }
 
-    $update_data['updated_at'] = current_time('mysql');
 
-    $result = $wpdb->update(
-        $table,
-        $update_data,
-        array('id' => $data->id)
-    );
+    /**
+     * Delete routing rule (prevent deleting default rule)
+     */
+    public static function delete_routing_rule($id)
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'intellisend_routing';
 
-    return $result !== false;
-}
+        // Get rule to check if it's default
+        $rule = self::get_routing_rule($id);
+        if (!$rule) {
+            error_log('IntelliSend: Rule not found for deletion: ' . $id);
+            return false;
+        }
 
-/**
- * Delete routing rule (prevent deleting default rule)
- */
-public static function delete_routing_rule($id) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'intellisend_routing';
+        // Don't allow deleting the default rule
+        if ($rule->is_default == 1 || $rule->priority == -1) {
+            error_log('IntelliSend: Attempted to delete default rule');
+            return false;
+        }
 
-    // Get rule to check if it's default
-    $rule = self::get_routing_rule($id);
-    if (!$rule) {
-        return false;
+        $result = $wpdb->delete($table, array('id' => $id), array('%d'));
+
+        if ($result === false) {
+            error_log('IntelliSend: Database error in delete_routing_rule: ' . $wpdb->last_error);
+            return false;
+        }
+
+        return true;
     }
-
-    // Don't allow deleting the default rule
-    if ($rule->is_default == 1) {
-        return false;
-    }
-
-    return $wpdb->delete($table, array('id' => $id)) !== false;
-}
 
     /**
      * Reports CRUD Operations

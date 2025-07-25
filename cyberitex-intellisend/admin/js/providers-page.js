@@ -1,3 +1,4 @@
+// cyberitex-intellisend/admin/js/providers-page.js
 /**
  * IntelliSend Providers Page JavaScript - Updated
  * 
@@ -253,6 +254,19 @@
                         $option.data('sender', formData.provider_sender);
                         $option.data('server', formData.provider_server);
                         $option.data('port', formData.provider_port);
+                        
+                        // Mark as configured and update the option text
+                        $option.text(formData.provider_name.charAt(0).toUpperCase() + formData.provider_name.slice(1) + ' (Configured)');
+                        
+                        // Clear the description since it's now configured
+                        $option.removeData('description');
+                        $option.removeData('help-link');
+                        $('#provider-description').fadeOut(200);
+                        
+                        // If this was the first provider configured, show additional message
+                        if (response.data.message.includes('Default routing rule')) {
+                            self.showNotification('info', 'This provider has been set as the default for all email routing.');
+                        }
                     } else {
                         // Show error message
                         self.showNotification('error', response.data.message || 'Failed to save provider');
@@ -342,13 +356,13 @@
                 notification.addClass('show');
             }, 10);
             
-            // Auto-dismiss after 3 seconds
+            // Auto-dismiss after 4 seconds
             setTimeout(function() {
                 notification.removeClass('show');
                 setTimeout(function() {
                     notification.remove();
                 }, 300);
-            }, 3000);
+            }, 4000);
         },
         
         /**
@@ -428,14 +442,16 @@
                     position: fixed;
                     bottom: 20px;
                     right: 20px;
-                    padding: 10px 15px;
-                    border-radius: 4px;
+                    padding: 12px 16px;
+                    border-radius: 6px;
                     background: #fff;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                     transform: translateX(120%);
                     transition: transform 0.3s ease;
                     z-index: 99999;
                     font-size: 14px;
+                    max-width: 350px;
+                    line-height: 1.4;
                 }
                 
                 .intellisend-notification.show {
@@ -444,14 +460,17 @@
                 
                 .intellisend-notification.success {
                     border-left: 4px solid #46b450;
+                    color: #155724;
                 }
                 
                 .intellisend-notification.error {
                     border-left: 4px solid #dc3232;
+                    color: #721c24;
                 }
                 
                 .intellisend-notification.info {
                     border-left: 4px solid #00a0d2;
+                    color: #0073aa;
                 }
                 
                 /* Field errors */
