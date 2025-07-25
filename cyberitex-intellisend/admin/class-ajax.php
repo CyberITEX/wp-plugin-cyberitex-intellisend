@@ -104,6 +104,9 @@ class IntelliSend_Ajax {
             case 'settings_saved':
                 self::handle_save_settings();
                 break;
+            case 'auto_save_setting':
+                self::handle_auto_save_setting();
+                break;
             case 'api_checked':
                 self::handle_api_check();
                 break;
@@ -122,7 +125,68 @@ class IntelliSend_Ajax {
     }
 
     /**
-     * Handle saving settings via AJAX
+     * Handle auto-saving individual settings
+     */
+    private static function handle_auto_save_setting() {
+        // Verify user permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => esc_html__('You do not have permission to perform this action.', 'intellisend')));
+            return;
+        }
+
+        // Get setting name and value
+        $setting_name = isset($_POST['setting_name']) ? sanitize_text_field($_POST['setting_name']) : '';
+        $setting_value = isset($_POST['setting_value']) ? sanitize_text_field($_POST['setting_value']) : '';
+
+        if (empty($setting_name)) {
+            wp_send_json_error(array('message' => esc_html__('Setting name is required.', 'intellisend')));
+            return;
+        }
+
+        // Get existing settings
+        $settings = IntelliSend_Database::get_settings();
+        if (!$settings) {
+            wp_send_json_error(array('message' => esc_html__('Settings not found.', 'intellisend')));
+            return;
+        }
+
+        // Validate and update the specific setting
+        $update_data = array();
+        
+        switch ($setting_name) {
+            case 'defaultProviderName':
+                $update_data['defaultProviderName'] = sanitize_text_field($setting_value);
+                break;
+                
+            case 'logsRetentionDays':
+                $update_data['logsRetentionDays'] = intval($setting_value);
+                break;
+                
+            case 'testRecipient':
+                if (!empty($setting_value) && !is_email($setting_value)) {
+                    wp_send_json_error(array('message' => esc_html__('Invalid email address.', 'intellisend')));
+                    return;
+                }
+                $update_data['testRecipient'] = sanitize_email($setting_value);
+                break;
+                
+            default:
+                wp_send_json_error(array('message' => esc_html__('Invalid setting name.', 'intellisend')));
+                return;
+        }
+
+        // Update settings in database
+        $result = IntelliSend_Database::update_settings($update_data);
+
+        if ($result) {
+            wp_send_json_success(array('message' => esc_html__('Setting saved successfully.', 'intellisend')));
+        } else {
+            wp_send_json_error(array('message' => esc_html__('Failed to save setting.', 'intellisend')));
+        }
+    }
+
+    /**
+     * Handle saving anti-spam settings via AJAX
      */
     private static function handle_save_settings() {
         // Verify user permissions
@@ -131,37 +195,26 @@ class IntelliSend_Ajax {
             return;
         }
 
-        // Parse the form data
-        $form_data = array();
-        parse_str($_POST['formData'], $form_data);
-        
         // Get existing settings to preserve values that shouldn't be changed
         $existing_settings = IntelliSend_Database::get_settings();
         
-        // Process and save settings
+        // Process and save only anti-spam settings
         $settings = array(
-            'defaultProviderName'  => isset($form_data['defaultProviderName']) ? sanitize_text_field($form_data['defaultProviderName']) : '',
-            'antiSpamEndPoint'     => isset($form_data['antiSpamEndPoint']) ? esc_url_raw($form_data['antiSpamEndPoint']) : 'https://api.cyberitex.com/v1/tools/SpamCheck',
-            'testRecipient'        => isset($form_data['testRecipient']) ? sanitize_email($form_data['testRecipient']) : '',
-            'spamTestMessage'      => $existing_settings->spamTestMessage, // Preserve the existing spam test message
-            'logsRetentionDays'    => isset($form_data['logsRetentionDays']) ? intval($form_data['logsRetentionDays']) : 365,
+            'antiSpamEndPoint'     => isset($_POST['antiSpamEndPoint']) ? esc_url_raw($_POST['antiSpamEndPoint']) : 'https://api.cyberitex.com/v1/tools/SpamCheck',
         );
         
         // Only update API key if a new one is provided
-        if (isset($form_data['antiSpamApiKey']) && !empty($form_data['antiSpamApiKey'])) {
-            $settings['antiSpamApiKey'] = sanitize_text_field($form_data['antiSpamApiKey']);
-        } else {
-            // Keep the existing API key
-            $settings['antiSpamApiKey'] = $existing_settings->antiSpamApiKey;
+        if (isset($_POST['antiSpamApiKey']) && !empty($_POST['antiSpamApiKey'])) {
+            $settings['antiSpamApiKey'] = sanitize_text_field($_POST['antiSpamApiKey']);
         }
 
         // Save settings to database
         $result = IntelliSend_Database::update_settings($settings);
 
         if ($result) {
-            wp_send_json_success(array('message' => esc_html__('Settings saved successfully!', 'intellisend')));
+            wp_send_json_success(array('message' => esc_html__('Anti-spam settings saved successfully!', 'intellisend')));
         } else {
-            wp_send_json_error(array('message' => esc_html__('Failed to save settings.', 'intellisend')));
+            wp_send_json_error(array('message' => esc_html__('Failed to save anti-spam settings.', 'intellisend')));
         }
     }
 

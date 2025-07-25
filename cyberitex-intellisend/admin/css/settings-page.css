@@ -1,7 +1,8 @@
+/* cyberitex-intellisend/admin/css/settings-page.css */
 /**
  * IntelliSend Settings Page Styles
  *
- * Modern and improved styles for the settings page.
+ * Modern and improved styles for the settings page with auto-save functionality.
  */
 
 /* General Styles */
@@ -17,15 +18,24 @@
     border-radius: 12px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     overflow: hidden;
+    margin-bottom: 24px;
 }
 
 .intellisend-settings-section {
     padding: 32px;
     border-bottom: 1px solid #f0f0f1;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
 .intellisend-settings-section:last-child {
     border-bottom: none;
+}
+
+.intellisend-settings-section.section-visible {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .intellisend-settings-section-title {
@@ -35,6 +45,12 @@
     color: #1e1e1e;
     position: relative;
     padding-bottom: 14px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.intellisend-settings-section-title:hover {
+    color: #2271b1;
 }
 
 .intellisend-settings-section-title:after {
@@ -46,6 +62,18 @@
     height: 3px;
     background: #2271b1;
     border-radius: 3px;
+}
+
+.section-toggle-indicator {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: transform 0.3s ease;
+}
+
+.section-collapsed {
+    background-color: #f8f9fa;
 }
 
 .intellisend-settings-row {
@@ -75,6 +103,11 @@
     font-weight: 500;
     color: #1e1e1e;
     font-size: 15px;
+}
+
+.field-focus label {
+    color: #2271b1 !important;
+    transition: color 0.2s ease;
 }
 
 .field-description {
@@ -258,6 +291,83 @@
     height: 20px;
 }
 
+/* Auto-Save Visual Feedback */
+.auto-saving {
+    position: relative;
+    opacity: 0.7;
+}
+
+.auto-saving::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(34, 113, 177, 0.3);
+    border-radius: 50%;
+    border-top-color: #2271b1;
+    animation: spin 0.8s linear infinite;
+    z-index: 1;
+}
+
+.auto-saved {
+    position: relative;
+    border-color: #46b450 !important;
+    box-shadow: 0 0 0 1px #46b450 !important;
+    transition: all 0.3s ease;
+}
+
+.auto-saved::after {
+    content: '✓';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #46b450;
+    font-weight: bold;
+    font-size: 14px;
+    z-index: 1;
+}
+
+.auto-save-error {
+    border-color: #d63638 !important;
+    box-shadow: 0 0 0 1px #d63638 !important;
+}
+
+.auto-save-error::after {
+    content: '✗';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #d63638;
+    font-weight: bold;
+    font-size: 14px;
+    z-index: 1;
+}
+
+/* Form Validation */
+.has-error {
+    border-color: #d63638 !important;
+    box-shadow: 0 0 0 1px #d63638 !important;
+}
+
+.field-error {
+    color: #d63638;
+    font-size: 13px;
+    margin-top: 5px;
+    display: block;
+    font-style: italic;
+}
+
+/* Highlight Effect */
+.highlight-field {
+    background-color: rgba(34, 113, 177, 0.05);
+    transition: background-color 0.6s ease;
+}
+
 /* Loading State */
 .is-loading {
     position: relative;
@@ -280,10 +390,71 @@
     border-top-color: #2c3338;
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+/* Page Loading Animation */
+#page-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-spinner-large {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(34, 113, 177, 0.3);
+    border-radius: 50%;
+    border-top-color: #2271b1;
+    animation: spin 1s linear infinite;
+}
+
+/* Test Result Styles */
+.test-result {
+    display: flex;
+    align-items: flex-start;
+    padding: 12px 16px;
+    margin-top: 10px;
+    border-radius: 6px;
+    background: #f8f9fa;
+    animation: slideIn 0.3s ease;
+}
+
+.test-result.spam {
+    background: #fcf0f1;
+}
+
+.test-result.not-spam {
+    background: #f0f6e9;
+}
+
+.test-result.error {
+    background: #fcf0f1;
+}
+
+.test-result .dashicons {
+    margin-right: 10px;
+    font-size: 20px;
+}
+
+.test-result.spam .dashicons {
+    color: #d63638;
+}
+
+.test-result.not-spam .dashicons {
+    color: #46b450;
+}
+
+.test-result.error .dashicons {
+    color: #d63638;
+}
+
+.test-result-content {
+    flex: 1;
 }
 
 /* Notifications */
@@ -295,18 +466,15 @@
     border-radius: 8px;
     border-left: 4px solid transparent;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
     animation: slideIn 0.3s ease-out;
 }
 
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.intellisend-notice.notice-visible {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .intellisend-notice.success {
@@ -359,13 +527,30 @@
     outline: none;
 }
 
-/* Section hover effect */
-.intellisend-settings-section {
-    transition: background-color 0.3s ease;
+/* API Key Info */
+.api-key-info {
+    font-size: 13px;
+    color: #757575;
+    margin-top: 8px;
+    font-style: italic;
 }
 
-.intellisend-settings-section:hover {
-    background-color: #fafafa;
+/* Animations */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Page Title */
@@ -420,119 +605,94 @@
 
 /* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
-    .admin-color-light .intellisend-settings-container,
-    .admin-color-modern .intellisend-settings-container,
-    .admin-color-blue .intellisend-settings-container,
-    .admin-color-coffee .intellisend-settings-container,
-    .admin-color-ectoplasm .intellisend-settings-container,
-    .admin-color-midnight .intellisend-settings-container,
-    .admin-color-ocean .intellisend-settings-container,
-    .admin-color-sunrise .intellisend-settings-container {
-        background: #1f2329;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    body:not([class*="admin-color-"]) #page-loading-overlay {
+        background: rgba(30, 30, 30, 0.9);
     }
     
-    .admin-color-light .intellisend-settings-section-title,
-    .admin-color-modern .intellisend-settings-section-title,
-    .admin-color-blue .intellisend-settings-section-title,
-    .admin-color-coffee .intellisend-settings-section-title,
-    .admin-color-ectoplasm .intellisend-settings-section-title,
-    .admin-color-midnight .intellisend-settings-section-title,
-    .admin-color-ocean .intellisend-settings-section-title,
-    .admin-color-sunrise .intellisend-settings-section-title {
-        color: #e2e4e7;
+    body:not([class*="admin-color-"]) .test-result {
+        background: #2c3338;
     }
     
-    .admin-color-light .intellisend-settings-section,
-    .admin-color-modern .intellisend-settings-section,
-    .admin-color-blue .intellisend-settings-section,
-    .admin-color-coffee .intellisend-settings-section,
-    .admin-color-ectoplasm .intellisend-settings-section,
-    .admin-color-midnight .intellisend-settings-section,
-    .admin-color-ocean .intellisend-settings-section,
-    .admin-color-sunrise .intellisend-settings-section {
-        border-bottom-color: #32373c;
+    body:not([class*="admin-color-"]) .test-result.spam {
+        background: rgba(214, 54, 56, 0.1);
     }
     
-    .admin-color-light .intellisend-settings-section:hover,
-    .admin-color-modern .intellisend-settings-section:hover,
-    .admin-color-blue .intellisend-settings-section:hover,
-    .admin-color-coffee .intellisend-settings-section:hover,
-    .admin-color-ectoplasm .intellisend-settings-section:hover,
-    .admin-color-midnight .intellisend-settings-section:hover,
-    .admin-color-ocean .intellisend-settings-section:hover,
-    .admin-color-sunrise .intellisend-settings-section:hover {
+    body:not([class*="admin-color-"]) .test-result.not-spam {
+        background: rgba(70, 180, 80, 0.1);
+    }
+    
+    body:not([class*="admin-color-"]) .test-result.error {
+        background: rgba(214, 54, 56, 0.1);
+    }
+    
+    body:not([class*="admin-color-"]) .section-collapsed {
         background-color: #23282d;
     }
-    
-    .admin-color-light .intellisend-settings-submit,
-    .admin-color-modern .intellisend-settings-submit,
-    .admin-color-blue .intellisend-settings-submit,
-    .admin-color-coffee .intellisend-settings-submit,
-    .admin-color-ectoplasm .intellisend-settings-submit,
-    .admin-color-midnight .intellisend-settings-submit,
-    .admin-color-ocean .intellisend-settings-submit,
-    .admin-color-sunrise .intellisend-settings-submit {
-        background: #151a22;
-        border-top-color: #32373c;
-    }
-    
-    .admin-color-light .intellisend-settings-field label,
-    .admin-color-modern .intellisend-settings-field label,
-    .admin-color-blue .intellisend-settings-field label,
-    .admin-color-coffee .intellisend-settings-field label,
-    .admin-color-ectoplasm .intellisend-settings-field label,
-    .admin-color-midnight .intellisend-settings-field label,
-    .admin-color-ocean .intellisend-settings-field label,
-    .admin-color-sunrise .intellisend-settings-field label {
-        color: #e2e4e7;
-    }
-    
-    .admin-color-light .intellisend-settings-field input,
-    .admin-color-modern .intellisend-settings-field input,
-    .admin-color-blue .intellisend-settings-field input,
-    .admin-color-coffee .intellisend-settings-field input,
-    .admin-color-ectoplasm .intellisend-settings-field input,
-    .admin-color-midnight .intellisend-settings-field input,
-    .admin-color-ocean .intellisend-settings-field input,
-    .admin-color-sunrise .intellisend-settings-field input,
-    .admin-color-light .intellisend-settings-field select,
-    .admin-color-modern .intellisend-settings-field select,
-    .admin-color-blue .intellisend-settings-field select,
-    .admin-color-coffee .intellisend-settings-field select,
-    .admin-color-ectoplasm .intellisend-settings-field select,
-    .admin-color-midnight .intellisend-settings-field select,
-    .admin-color-ocean .intellisend-settings-field select,
-    .admin-color-sunrise .intellisend-settings-field select,
-    .admin-color-light .intellisend-settings-field textarea,
-    .admin-color-modern .intellisend-settings-field textarea,
-    .admin-color-blue .intellisend-settings-field textarea,
-    .admin-color-coffee .intellisend-settings-field textarea,
-    .admin-color-ectoplasm .intellisend-settings-field textarea,
-    .admin-color-midnight .intellisend-settings-field textarea,
-    .admin-color-ocean .intellisend-settings-field textarea,
-    .admin-color-sunrise .intellisend-settings-field textarea {
-        background-color: #2c3338;
-        border-color: #3c434a;
-        color: #e2e4e7;
-    }
-    
-    .admin-color-light .intellisend-settings-field input::placeholder,
-    .admin-color-modern .intellisend-settings-field input::placeholder,
-    .admin-color-blue .intellisend-settings-field input::placeholder,
-    .admin-color-coffee .intellisend-settings-field input::placeholder,
-    .admin-color-ectoplasm .intellisend-settings-field input::placeholder,
-    .admin-color-midnight .intellisend-settings-field input::placeholder,
-    .admin-color-ocean .intellisend-settings-field input::placeholder,
-    .admin-color-sunrise .intellisend-settings-field input::placeholder,
-    .admin-color-light .intellisend-settings-field textarea::placeholder,
-    .admin-color-modern .intellisend-settings-field textarea::placeholder,
-    .admin-color-blue .intellisend-settings-field textarea::placeholder,
-    .admin-color-coffee .intellisend-settings-field textarea::placeholder,
-    .admin-color-ectoplasm .intellisend-settings-field textarea::placeholder,
-    .admin-color-midnight .intellisend-settings-field textarea::placeholder,
-    .admin-color-ocean .intellisend-settings-field textarea::placeholder,
-    .admin-color-sunrise .intellisend-settings-field textarea::placeholder {
-        color: #a7aaad;
-    }
+}
+
+/* WordPress Theme Compatibility */
+.admin-color-light .intellisend-settings-container,
+.admin-color-modern .intellisend-settings-container,
+.admin-color-blue .intellisend-settings-container,
+.admin-color-coffee .intellisend-settings-container,
+.admin-color-ectoplasm .intellisend-settings-container,
+.admin-color-midnight .intellisend-settings-container,
+.admin-color-ocean .intellisend-settings-container,
+.admin-color-sunrise .intellisend-settings-container {
+    background: #1f2329;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.admin-color-midnight .intellisend-settings-section-title,
+.admin-color-modern .intellisend-settings-section-title {
+    color: #e2e4e7;
+}
+
+.admin-color-midnight .intellisend-settings-section,
+.admin-color-modern .intellisend-settings-section {
+    border-bottom-color: #32373c;
+}
+
+.admin-color-midnight .intellisend-settings-section:hover,
+.admin-color-modern .intellisend-settings-section:hover {
+    background-color: #23282d;
+}
+
+.admin-color-midnight .intellisend-settings-submit,
+.admin-color-modern .intellisend-settings-submit {
+    background: #151a22;
+    border-top-color: #32373c;
+}
+
+.admin-color-midnight .intellisend-settings-field label,
+.admin-color-modern .intellisend-settings-field label {
+    color: #e2e4e7;
+}
+
+.admin-color-midnight .intellisend-settings-field input,
+.admin-color-modern .intellisend-settings-field input,
+.admin-color-midnight .intellisend-settings-field select,
+.admin-color-modern .intellisend-settings-field select,
+.admin-color-midnight .intellisend-settings-field textarea,
+.admin-color-modern .intellisend-settings-field textarea {
+    background-color: #2c3338;
+    border-color: #3c434a;
+    color: #e2e4e7;
+}
+
+.admin-color-midnight .intellisend-settings-field input::placeholder,
+.admin-color-modern .intellisend-settings-field input::placeholder,
+.admin-color-midnight .intellisend-settings-field textarea::placeholder,
+.admin-color-modern .intellisend-settings-field textarea::placeholder {
+    color: #a7aaad;
+}
+
+.admin-color-midnight #page-loading-overlay,
+.admin-color-modern #page-loading-overlay {
+    background: rgba(30, 30, 30, 0.9);
+}
+
+.admin-color-midnight .section-collapsed,
+.admin-color-modern .section-collapsed {
+    background-color: #23282d;
 }

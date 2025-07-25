@@ -15,8 +15,7 @@ if (!defined('WPINC')) {
  */
 function intellisend_render_settings_page_content() {
     // Get settings
-    $z = IntelliSend_Database::get_settings();
-
+    $settings = IntelliSend_Database::get_settings();
 
     // Get providers
     $providers = IntelliSend_Database::get_providers(array( 'configured' => 1 ));
@@ -33,55 +32,60 @@ function intellisend_render_settings_page_content() {
     <div class="wrap intellisend-settings-wrap">
         <h1><?php echo esc_html__('IntelliSend Settings', 'intellisend'); ?></h1>
         
-        <!-- Settings form with compact structure -->
-        <form id="intellisend-settings-form" method="post" action="">
-            <div class="intellisend-settings-container">
-                <?php wp_nonce_field('intellisend_settings', 'intellisend_settings_nonce'); ?>
+        <?php wp_nonce_field('intellisend_settings', 'intellisend_settings_nonce'); ?>
+        
+        <!-- Auto-Save Settings Container -->
+        <div class="intellisend-settings-container">
+            <!-- General Settings Section (Auto-Save) -->
+            <div class="intellisend-settings-section">
+                <h2 class="intellisend-settings-section-title"><?php echo esc_html__('General Settings', 'intellisend'); ?> <span style="font-size: 12px; color: #666; font-weight: normal;">(Auto-saved)</span></h2>
                 
-                <!-- General Settings Section -->
-                <div class="intellisend-settings-section">
-                    <h2 class="intellisend-settings-section-title"><?php echo esc_html__('General Settings', 'intellisend'); ?></h2>
-                    
-                    <div class="intellisend-settings-row">
-                        <div class="intellisend-settings-field">
-                            <label for="default-provider"><?php echo esc_html__('Default SMTP Provider', 'intellisend'); ?></label>
-                            <select name="defaultProviderName" id="default-provider">
-                                <?php if (empty($providers)) : ?>
-                                    <option value=""><?php echo esc_html__('No providers available', 'intellisend'); ?></option>
-                                <?php else : ?>
-                                    <?php foreach ($providers as $provider) : ?>
-                                        <option value="<?php echo esc_attr($provider->name); ?>" <?php selected($z->defaultProviderName, $provider->name); ?>><?php echo esc_html($provider->name); ?></option>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="intellisend-settings-field">
-                            <label for="test-recipient"><?php echo esc_html__('Test Recipient Email', 'intellisend'); ?></label>
-                            <div class="input-with-button">
-                                <input type="email" name="testRecipient" id="test-recipient" value="<?php echo esc_attr($z->testRecipient ?? ''); ?>" placeholder="email@example.com">
-                                <button type="button" id="send-test-email" class="button button-secondary"><?php echo esc_html__('Send Test', 'intellisend'); ?></button>
-                            </div>
-                        </div>
+                <div class="intellisend-settings-row">
+                    <div class="intellisend-settings-field">
+                        <label for="default-provider"><?php echo esc_html__('Default SMTP Provider', 'intellisend'); ?></label>
+                        <select name="defaultProviderName" id="default-provider">
+                            <?php if (empty($providers)) : ?>
+                                <option value=""><?php echo esc_html__('No providers available', 'intellisend'); ?></option>
+                            <?php else : ?>
+                                <?php foreach ($providers as $provider) : ?>
+                                    <option value="<?php echo esc_attr($provider->name); ?>" <?php selected($settings->defaultProviderName, $provider->name); ?>><?php echo esc_html($provider->name); ?></option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <span class="field-description"><?php echo esc_html__('Changes are saved automatically when you select a different provider.', 'intellisend'); ?></span>
                     </div>
                     
-                    <div class="intellisend-settings-row">
-                        <div class="intellisend-settings-field">
-                            <label for="logs-retention-days"><?php echo esc_html__('Logs Retention Period', 'intellisend'); ?></label>
-                            <input type="hidden" name="logsRetentionDays" id="logs-retention-days" value="<?php echo esc_attr($z->logsRetentionDays ?? 30); ?>">
-                            <!-- Dropdown will be inserted here by JavaScript -->
+                    <div class="intellisend-settings-field">
+                        <label for="test-recipient"><?php echo esc_html__('Test Recipient Email', 'intellisend'); ?></label>
+                        <div class="input-with-button">
+                            <input type="email" name="testRecipient" id="test-recipient" value="<?php echo esc_attr($settings->testRecipient ?? ''); ?>" placeholder="email@example.com">
+                            <button type="button" id="send-test-email" class="button button-secondary"><?php echo esc_html__('Send Test', 'intellisend'); ?></button>
                         </div>
+                        <span class="field-description"><?php echo esc_html__('Changes are saved automatically 1 second after you stop typing.', 'intellisend'); ?></span>
                     </div>
                 </div>
                 
-                <!-- Anti-Spam Settings Section -->
+                <div class="intellisend-settings-row">
+                    <div class="intellisend-settings-field">
+                        <label for="logs-retention-days"><?php echo esc_html__('Logs Retention Period', 'intellisend'); ?></label>
+                        <input type="hidden" name="logsRetentionDays" id="logs-retention-days" value="<?php echo esc_attr($settings->logsRetentionDays ?? 30); ?>">
+                        <!-- Dropdown will be inserted here by JavaScript -->
+                        <span class="field-description"><?php echo esc_html__('Changes are saved automatically when you select a different period.', 'intellisend'); ?></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Anti-Spam Settings Form (Manual Save) -->
+        <form id="intellisend-settings-form" method="post" action="">
+            <div class="intellisend-settings-container">
                 <div class="intellisend-settings-section">
                     <h2 class="intellisend-settings-section-title"><?php echo esc_html__('Anti-Spam Settings', 'intellisend'); ?></h2>
                     
                     <div class="intellisend-settings-row">
                         <div class="intellisend-settings-field">
                             <label for="anti-spam-endpoint"><?php echo esc_html__('Endpoint', 'intellisend'); ?></label>
-                            <input type="url" name="antiSpamEndPoint" id="anti-spam-endpoint" value="<?php echo esc_attr($z->antiSpamEndPoint ?? ''); ?>" placeholder="https://api.example.com/spam-check">
+                            <input type="url" name="antiSpamEndPoint" id="anti-spam-endpoint" value="<?php echo esc_attr($settings->antiSpamEndPoint ?? ''); ?>" placeholder="https://api.example.com/spam-check">
                         </div>
                         
                         <div class="intellisend-settings-field">
@@ -90,7 +94,7 @@ function intellisend_render_settings_page_content() {
                                 <input type="password" name="antiSpamApiKey" id="api-key" value="" placeholder="Enter your API key">
                                 <!-- Password toggle will be inserted here by JavaScript -->
                             </div>
-                            <?php if (!empty($z->antiSpamApiKey)) : ?>
+                            <?php if (!empty($settings->antiSpamApiKey)) : ?>
                                 <p class="api-key-info"><?php echo esc_html__('API key is stored securely. For security reasons, it is not displayed.', 'intellisend'); ?></p>
                                 <input type="hidden" id="has-existing-api-key" value="1">
                             <?php else: ?>
@@ -101,16 +105,19 @@ function intellisend_render_settings_page_content() {
                     
                     <div class="intellisend-settings-row">
                         <div class="intellisend-settings-field full-width">
-                            <label for="anti-spam-subject-patterns"><?php echo esc_html__('Check Spam Only for These Subjects', 'intellisend'); ?></label>
-                            <textarea name="antiSpamSubjectPatterns" id="anti-spam-subject-patterns" rows="4" placeholder="contact*&#10;inquiry*&#10;*support*"><?php echo esc_textarea($settings->antiSpamSubjectPatterns ?? ''); ?></textarea>
-                            <span class="field-description"><?php echo esc_html__('Enter subject patterns (one per line). Use * for wildcards. Leave empty to check all emails based on routing rules.', 'intellisend'); ?></span>
+                            <label for="spam-test-message"><?php echo esc_html__('Test Spam Message', 'intellisend'); ?></label>
+                            <div class="textarea-with-button">
+                                <textarea id="spam-test-message" rows="4" placeholder="Enter a test message to check if it's detected as spam..."><?php echo esc_attr($settings->spamTestMessage ?? 'URGENT: Your account has been compromised! Click here to verify: http://suspicious-link.com - Claim your $500 prize now! Limited time offer for Viagra and other medications at 90% discount. Reply with your credit card details.'); ?></textarea>
+                                <button type="button" id="test-spam-detection" class="button button-secondary"><?php echo esc_html__('Test Spam Detection', 'intellisend'); ?></button>
+                            </div>
+                            <span class="field-description"><?php echo esc_html__('Use this to test if your spam detection is working correctly. This message is not saved.', 'intellisend'); ?></span>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Submit Section -->
                 <div class="intellisend-settings-submit">
-                    <button type="submit" class="button button-primary"><?php echo esc_html__('Save Settings', 'intellisend'); ?></button>
+                    <button type="submit" class="button button-primary"><?php echo esc_html__('Save Anti-Spam Settings', 'intellisend'); ?></button>
                 </div>
             </div>
         </form>

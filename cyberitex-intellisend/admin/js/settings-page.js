@@ -1,7 +1,8 @@
+// cyberitex-intellisend/admin/js/settings-page.js
 /**
  * IntelliSend Settings Page JavaScript
  * 
- * Handles enhanced functionality for the settings page with improved UX.
+ * Handles enhanced functionality for the settings page with auto-save and improved UX.
  */
 
 (function($) {
@@ -15,13 +16,13 @@
         init: function() {
             this.setupPasswordToggle();
             this.setupLogsRetentionDropdown();
+            this.setupAutoSave(); // Add auto-save setup
             this.handleFormSubmit();
             this.setupSpamDetectionTest();
             this.setupTestEmailSending();
             this.setupFormAnimations();
             this.setupSectionToggle();
             this.setupPageLoadEffects();
-            this.injectCustomStyles();
         },
 
         /**
@@ -105,7 +106,7 @@
             // Add select to DOM
             $originalInput.after($select);
             
-            // Listen for changes
+            // Listen for changes (auto-save will be handled in setupAutoSave)
             $select.on('change', function() {
                 const newVal = $(this).val();
                 $originalInput.val(newVal);
@@ -119,7 +120,107 @@
         },
         
         /**
-         * Handle form submission
+         * Auto-save individual settings when changed
+         */
+        setupAutoSave: function() {
+            const self = this;
+            
+            // Auto-save default provider when changed
+            $('#default-provider').on('change', function() {
+                const $field = $(this);
+                const newValue = $field.val();
+                
+                self.autoSaveSetting('defaultProviderName', newValue, $field, 'Default SMTP provider updated');
+            });
+            
+            // Auto-save logs retention when changed
+            $(document).on('change', '#logs-retention-select', function() {
+                const $field = $(this);
+                const newValue = $field.val();
+                
+                // Update the hidden input
+                $('#logs-retention-days').val(newValue);
+                
+                self.autoSaveSetting('logsRetentionDays', newValue, $field, 'Logs retention period updated');
+            });
+            
+            // Auto-save test recipient when changed (with debounce)
+            let testRecipientTimeout;
+            $('#test-recipient').on('input', function() {
+                const $field = $(this);
+                const newValue = $field.val();
+                
+                // Clear previous timeout
+                clearTimeout(testRecipientTimeout);
+                
+                // Only save if it's a valid email or empty
+                if (newValue === '' || self.isValidEmail(newValue)) {
+                    testRecipientTimeout = setTimeout(function() {
+                        self.autoSaveSetting('testRecipient', newValue, $field, 'Test recipient updated');
+                    }, 1000); // 1 second delay
+                }
+            });
+        },
+        
+        /**
+         * Auto-save a single setting
+         */
+        autoSaveSetting: function(settingName, value, $field, successMessage) {
+            const self = this;
+            
+            // Add visual feedback
+            $field.addClass('auto-saving');
+            
+            // Prepare data
+            const data = {
+                action: 'intellisend_ajax_handler',
+                sub_action: 'auto_save_setting',
+                nonce: $('#intellisend_settings_nonce').val(),
+                setting_name: settingName,
+                setting_value: value
+            };
+            
+            // Send AJAX request
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: data,
+                success: function(response) {
+                    if (response.success) {
+                        // Show brief success feedback
+                        $field.removeClass('auto-saving').addClass('auto-saved');
+                        
+                        // Show toast notification
+                        IntelliSendToast.success(successMessage, {
+                            duration: 2000
+                        });
+                        
+                        // Remove success class after animation
+                        setTimeout(function() {
+                            $field.removeClass('auto-saved');
+                        }, 2000);
+                    } else {
+                        $field.removeClass('auto-saving').addClass('auto-save-error');
+                        IntelliSendToast.error('Failed to save: ' + (response.data.message || 'Unknown error'));
+                        
+                        setTimeout(function() {
+                            $field.removeClass('auto-save-error');
+                        }, 3000);
+                    }
+                },
+                error: function() {
+                    $field.removeClass('auto-saving').addClass('auto-save-error');
+                    IntelliSendToast.error('Network error occurred while saving');
+                    
+                    setTimeout(function() {
+                        $field.removeClass('auto-save-error');
+                    }, 3000);
+                }
+            });
+        },
+        
+        /**
+         * Handle form submission (only for Anti-Spam settings)
          */
         handleFormSubmit: function() {
             const self = this;
@@ -148,8 +249,8 @@
                     // Validate the new API key
                     self.validateApiKey(apiKey, endpoint, function(isValid) {
                         if (isValid) {
-                            // API key is valid, save settings
-                            self.saveSettings($form, $submitButton, originalButtonText);
+                            // API key is valid, save anti-spam settings only
+                            self.saveAntiSpamSettings($form, $submitButton, originalButtonText);
                         } else {
                             // API key is invalid, reset button state
                             self.resetButtonLoading($submitButton, originalButtonText);
@@ -160,8 +261,8 @@
                     });
                 } else if (hasExistingApiKey) {
                     // No new API key provided, but an existing one is in the database
-                    // Just save the settings without API key validation
-                    self.saveSettings($form, $submitButton, originalButtonText);
+                    // Just save the anti-spam settings without API key validation
+                    self.saveAntiSpamSettings($form, $submitButton, originalButtonText);
                 } else if (endpoint.trim() !== '') {
                     // No API key provided (new or existing) but endpoint is specified
                     // Show error message
@@ -169,15 +270,15 @@
                     self.resetButtonLoading($submitButton, originalButtonText);
                     $form.find('button').prop('disabled', false);
                 } else {
-                    // No API key or endpoint provided, just save settings
-                    self.saveSettings($form, $submitButton, originalButtonText);
+                    // No API key or endpoint provided, just save anti-spam settings
+                    self.saveAntiSpamSettings($form, $submitButton, originalButtonText);
                 }
                 
                 // Prevent default form submission
                 return false;
             });
         },
-        
+
         /**
          * Validate API key with the server
          */
@@ -215,34 +316,35 @@
         },
         
         /**
-         * Save settings to the server
+         * Save anti-spam settings to the server
          */
-        saveSettings: function($form, $submitButton, originalButtonText) {
+        saveAntiSpamSettings: function($form, $submitButton, originalButtonText) {
             const self = this;
             
-            // Get form data
-            const formData = $form.serialize();
+            // Get only anti-spam related form data
+            const formData = {
+                action: 'intellisend_ajax_handler',
+                sub_action: 'settings_saved',
+                nonce: $('#intellisend_settings_nonce').val(),
+                antiSpamEndPoint: $('#anti-spam-endpoint').val(),
+                antiSpamApiKey: $('#api-key').val()
+            };
             
             // Send AJAX request
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
-                data: {
-                    action: 'intellisend_ajax_handler',
-                    sub_action: 'settings_saved',
-                    formData: formData,
-                    nonce: $('#intellisend_settings_nonce').val()
-                },
+                data: formData,
                 success: function(response) {
                     if (response.success) {
                         // Show success message
-                        IntelliSendToast.success('Settings saved successfully.');
+                        IntelliSendToast.success('Anti-spam settings saved successfully.');
                         
                         // Clear API key field for security
                         $('#api-key').val('');
                     } else {
                         // Show error message
-                        const errorMessage = response.data && response.data.message ? response.data.message : 'An error occurred while saving settings.';
+                        const errorMessage = response.data && response.data.message ? response.data.message : 'An error occurred while saving anti-spam settings.';
                         IntelliSendToast.error(errorMessage);
                     }
                 },
@@ -393,8 +495,8 @@
                     data: {
                         action: 'intellisend_ajax_handler',
                         sub_action: 'test_email_sent',
-                        email: email,
-                        provider: provider,
+                        test_email: email,
+                        provider_id: provider,
                         nonce: $('#intellisend_settings_nonce').val()
                     },
                     success: function(response) {
@@ -587,273 +689,7 @@
             }, 300);
         },
         
-        /**
-         * Inject custom CSS styles
-         */
-        injectCustomStyles: function() {
-            const customStyles = `
-                /* Form validation styles */
-                .has-error {
-                    border-color: #d63638 !important;
-                    box-shadow: 0 0 0 1px #d63638 !important;
-                }
-                .field-error {
-                    color: #d63638;
-                    font-size: 13px;
-                    margin-top: 5px;
-                    display: block;
-                    font-style: italic;
-                }
-                
-                /* Field focus effects */
-                .field-focus label {
-                    color: #2271b1 !important;
-                    transition: color 0.2s ease;
-                }
-                
-                /* Highlight effect */
-                .highlight-field {
-                    background-color: rgba(34, 113, 177, 0.05);
-                    transition: background-color 0.6s ease;
-                }
-                
-                /* Test result styles */
-                .test-result {
-                    display: flex;
-                    align-items: flex-start;
-                    padding: 12px 16px;
-                    margin-top: 10px;
-                    border-radius: 6px;
-                    background: #f8f9fa;
-                    animation: slideIn 0.3s ease;
-                }
-                .test-result.spam { background: #fcf0f1; }
-                .test-result.not-spam { background: #f0f6e9; }
-                .test-result.error { background: #fcf0f1; }
-                
-                .test-result .dashicons {
-                    margin-right: 10px;
-                    font-size: 20px;
-                }
-                .test-result.spam .dashicons { color: #d63638; }
-                .test-result.not-spam .dashicons { color: #46b450; }
-                .test-result.error .dashicons { color: #d63638; }
-                
-                .test-result-content { flex: 1; }
-                
-                /* Section toggle styles */
-                .intellisend-settings-section-title {
-                    cursor: pointer;
-                    position: relative;
-                    transition: color 0.2s ease;
-                }
-                .intellisend-settings-section-title:hover {
-                    color: #2271b1;
-                }
-                .section-toggle-indicator {
-                    position: absolute;
-                    right: 0;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    transition: transform 0.3s ease;
-                }
-                .section-collapsed {
-                    background-color: #f8f9fa;
-                }
-                
-                /* Page loading animation */
-                #page-loading-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(255,255,255,0.9);
-                    z-index: 9999;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                }
-                .loading-spinner-large {
-                    width: 40px;
-                    height: 40px;
-                    border: 3px solid rgba(34,113,177,0.3);
-                    border-radius: 50%;
-                    border-top-color: #2271b1;
-                    animation: spin 1s linear infinite;
-                }
-                
-                /* Section visibility animation */
-                .intellisend-settings-section {
-                    opacity: 0;
-                    transform: translateY(10px);
-                    transition: opacity 0.4s ease, transform 0.4s ease;
-                }
-                .section-visible {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-                
-                /* Notice animation */
-                .intellisend-notice {
-                    opacity: 0;
-                    transform: translateY(-10px);
-                    transition: opacity 0.3s ease, transform 0.3s ease;
-                }
-                .notice-visible {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-                
-                /* Toast styles */
-                .intellisend-toast {
-                    position: fixed;
-                    bottom: 20px;
-                    right: 20px;
-                    z-index: 9999;
-                    padding: 10px 20px;
-                    border-radius: 6px;
-                    background: #f8f9fa;
-                    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-                    display: flex;
-                    align-items: center;
-                    transform: translateY(10px);
-                    opacity: 0;
-                    transition: transform 0.3s ease, opacity 0.3s ease;
-                }
-                .intellisend-toast.show {
-                    transform: translateY(0);
-                    opacity: 1;
-                }
-                .intellisend-toast.spam {
-                    background: #fcf0f1;
-                }
-                .intellisend-toast.not-spam {
-                    background: #f0f6e9;
-                }
-                .intellisend-toast.error {
-                    background: #fcf0f1;
-                }
-                
-                .intellisend-toast .dashicons {
-                    margin-right: 10px;
-                    font-size: 20px;
-                }
-                .intellisend-toast.spam .dashicons { color: #d63638; }
-                .intellisend-toast.not-spam .dashicons { color: #46b450; }
-                .intellisend-toast.error .dashicons { color: #d63638; }
-                
-                .intellisend-toast .toast-content { flex: 1; }
-                
-                /* Animations */
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
-                }
-                @keyframes slideIn {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-10px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                
-                /* Debug info styles */
-                .api-debug-container {
-                    margin-top: 20px;
-                    padding: 15px;
-                    background: #f8f9fa;
-                    border-radius: 4px;
-                    border: 1px solid #ddd;
-                }
-                
-                .debug-section {
-                    padding: 10px;
-                    border-radius: 4px;
-                }
-                
-                .debug-section.success {
-                    background: rgba(70, 180, 80, 0.1);
-                    border-left: 4px solid #46b450;
-                }
-                
-                .debug-section.error {
-                    background: rgba(214, 54, 56, 0.1);
-                    border-left: 4px solid #d63638;
-                }
-                
-                .debug-section h3 {
-                    margin-top: 0;
-                    color: #23282d;
-                }
-                
-                .debug-section pre {
-                    background: rgba(0, 0, 0, 0.05);
-                    padding: 10px;
-                    overflow: auto;
-                    max-height: 200px;
-                    font-family: monospace;
-                    font-size: 12px;
-                    white-space: pre-wrap;
-                    word-break: break-all;
-                }
-                
-                .debug-note {
-                    font-style: italic;
-                    color: #666;
-                    margin-top: 10px;
-                }
-                
-                .debug-headers, .debug-body {
-                    margin-bottom: 10px;
-                }
-                
-                /* Dark mode enhancements */
-                @media (prefers-color-scheme: dark) {
-                    #page-loading-overlay {
-                        background: rgba(30, 30, 30, 0.9);
-                    }
-                    .test-result {
-                        background: #2c3338;
-                    }
-                    .test-result.spam {
-                        background: rgba(214, 54, 56, 0.1);
-                    }
-                    .test-result.not-spam {
-                        background: rgba(70, 180, 80, 0.1);
-                    }
-                    .test-result.error {
-                        background: rgba(214, 54, 56, 0.1);
-                    }
-                    .section-collapsed {
-                        background-color: #23282d;
-                    }
-                    .api-debug-container {
-                        background: #2c3338;
-                        border-color: #1d2327;
-                    }
-                    
-                    .debug-section h3 {
-                        color: #f0f0f1;
-                    }
-                    
-                    .debug-section pre {
-                        background: rgba(0, 0, 0, 0.2);
-                        color: #bbb;
-                    }
-                    
-                    .debug-note {
-                        color: #aaa;
-                    }
-                }
-            `;
-            
-            $('<style id="intellisend-custom-styles"></style>')
-                .text(customStyles)
-                .appendTo('head');
-        }
+
     };
 
     // Initialize on document ready
