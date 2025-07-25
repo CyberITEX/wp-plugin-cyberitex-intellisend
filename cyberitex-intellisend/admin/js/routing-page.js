@@ -664,20 +664,14 @@
                 console.log('Default rule - skipping patterns and priority');
             }
             
-            // Handle checkboxes - only add if enabled
-            if (ruleEnabled === '1') {
-                console.log('Adding enabled=1');
-                $form.append('<input type="hidden" name="enabled" value="1">');
-            } else {
-                console.log('enabled is not 1, not adding to form');
-            }
+            // Handle checkboxes - ALWAYS add both enabled and anti_spam_enabled
+            // This ensures the backend receives explicit values for both on/off states
+            console.log('Adding enabled=' + (ruleEnabled === '1' ? '1' : '0'));
+            $form.append(`<input type="hidden" name="enabled" value="${ruleEnabled === '1' ? '1' : '0'}">`);
             
-            if (ruleAntispam === '1') {
-                console.log('Adding anti_spam_enabled=1');
-                $form.append('<input type="hidden" name="anti_spam_enabled" value="1">');
-            } else {
-                console.log('anti_spam_enabled is not 1, not adding to form');
-            }
+            console.log('Adding anti_spam_enabled=' + (ruleAntispam === '1' ? '1' : '0'));
+            $form.append(`<input type="hidden" name="anti_spam_enabled" value="${ruleAntispam === '1' ? '1' : '0'}">`);
+            
             
             const serializedData = $form.serialize();
             console.log('Final serialized data:', serializedData);
