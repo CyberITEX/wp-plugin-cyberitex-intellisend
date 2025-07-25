@@ -624,14 +624,21 @@ class IntelliSend_Ajax
             return;
         }
 
-        // Get form data
-        if (!isset($_POST['formData']) || !is_array($_POST['formData'])) {
-            error_log('IntelliSend: Invalid form data in handle_update_routing_rule');
+        // Get form data - handle both array and serialized string formats
+        if (!isset($_POST['formData'])) {
+            error_log('IntelliSend: No form data provided in handle_update_routing_rule');
             wp_send_json_error('Invalid form data.');
             return;
         }
 
         $formData = $_POST['formData'];
+
+        // If formData is a serialized string, parse it
+        if (is_string($formData)) {
+            $parsed_data = array();
+            parse_str($formData, $parsed_data);
+            $formData = $parsed_data;
+        }
 
         // Log the received data for debugging
         error_log('IntelliSend: Update routing rule data: ' . print_r($formData, true));
@@ -653,11 +660,6 @@ class IntelliSend_Ajax
             return;
         }
 
-        if (empty($formData['subject_patterns'])) {
-            wp_send_json_error('At least one pattern is required.');
-            return;
-        }
-
         // Get existing rule
         $rule_id = intval($formData['id']);
         $existing_rule = IntelliSend_Database::get_routing_rule($rule_id);
@@ -669,6 +671,12 @@ class IntelliSend_Ajax
 
         // Special handling for default rule
         $is_default_rule = ($rule_id == 1 || $existing_rule->priority == -1 || $existing_rule->is_default == 1);
+
+        // For non-default rules, validate subject patterns
+        if (!$is_default_rule && empty($formData['subject_patterns'])) {
+            wp_send_json_error('At least one pattern is required.');
+            return;
+        }
 
         // Prepare rule data object
         $rule = new stdClass();

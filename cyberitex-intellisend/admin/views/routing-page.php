@@ -186,11 +186,11 @@ function intellisend_render_routing_page_content()
                                                     
                                                     <?php if ($rule->enabled) : ?>
                                                         <button type="button" class="action-button deactivate-rule" data-id="<?php echo esc_attr($rule->id); ?>" title="<?php echo esc_attr__('Deactivate', 'intellisend'); ?>">
-                                                            <span class="dashicons dashicons-hidden"></span>
+                                                            <span class="dashicons dashicons-controls-pause"></span>
                                                         </button>
                                                     <?php else : ?>
                                                         <button type="button" class="action-button activate-rule" data-id="<?php echo esc_attr($rule->id); ?>" title="<?php echo esc_attr__('Activate', 'intellisend'); ?>">
-                                                            <span class="dashicons dashicons-visibility"></span>
+                                                            <span class="dashicons dashicons-controls-play"></span>
                                                         </button>
                                                     <?php endif; ?>
                                                     
