@@ -1,4 +1,5 @@
 <?php
+// cyberitex-intellisend/admin/views/routing-page.php
 /**
  * Admin page for managing email routing rules
  *
@@ -20,6 +21,10 @@ function intellisend_render_routing_page_content()
 
     // Get all configured providers
     $providers = IntelliSend_Database::get_providers(array('configured' => 1));
+    
+    // Get settings for default recipient
+    $settings = IntelliSend_Database::get_settings();
+    $default_recipient = $settings ? $settings->testRecipient : get_option('admin_email');
     ?>
     <div class="wrap intellisend-admin">
         <h1><?php echo esc_html__('Email Routing', 'intellisend'); ?></h1>
@@ -61,10 +66,12 @@ function intellisend_render_routing_page_content()
                             <?php else : ?>
                                 <?php foreach ($routing_rules as $rule) : 
                                     $is_default_rule = ($rule->id == 1 || $rule->priority == -1);
-                                    $provider_name = '';
+                                    
+                                    // Find provider display name
+                                    $provider_display_name = $rule->default_provider_name;
                                     foreach ($providers as $provider) {
-                                        if ($provider->name == $rule->default_provider_name) {
-                                            $provider_name = $provider->name;
+                                        if ($provider->name === $rule->default_provider_name) {
+                                            $provider_display_name = ucfirst($provider->name);
                                             break;
                                         }
                                     }
@@ -72,21 +79,27 @@ function intellisend_render_routing_page_content()
                                     <tr class="rule-row" data-id="<?php echo esc_attr($rule->id); ?>" data-is-default="<?php echo $is_default_rule ? '1' : '0'; ?>">
                                         <td class="editable" data-field="name">
                                             <span class="view-mode"><?php echo esc_html($rule->name); ?></span>
-                                            <input type="text" class="edit-mode rule-name" value="<?php echo esc_attr($rule->name); ?>" style="display:none;">
                                             <?php if ($is_default_rule) : ?>
+                                                <input type="text" class="edit-mode rule-name" value="<?php echo esc_attr($rule->name); ?>" style="display:none;" readonly>
                                                 <span class="default-badge"><?php echo esc_html__('Default', 'intellisend'); ?></span>
+                                            <?php else : ?>
+                                                <input type="text" class="edit-mode rule-name" value="<?php echo esc_attr($rule->name); ?>" style="display:none;">
                                             <?php endif; ?>
                                         </td>
                                         <td class="editable" data-field="patterns">
                                             <span class="view-mode"><?php echo esc_html($rule->subject_patterns); ?></span>
-                                            <textarea class="edit-mode rule-patterns" style="display:none;"><?php echo esc_textarea($rule->subject_patterns); ?></textarea>
+                                            <?php if ($is_default_rule) : ?>
+                                                <textarea class="edit-mode rule-patterns" style="display:none;" readonly><?php echo esc_textarea($rule->subject_patterns); ?></textarea>
+                                            <?php else : ?>
+                                                <textarea class="edit-mode rule-patterns" style="display:none;"><?php echo esc_textarea($rule->subject_patterns); ?></textarea>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="editable" data-field="provider">
-                                            <span class="view-mode"><?php echo esc_html($provider_name); ?></span>
+                                            <span class="view-mode"><?php echo esc_html($provider_display_name); ?></span>
                                             <select class="edit-mode rule-provider" style="display:none;">
                                                 <?php foreach ($providers as $provider) : ?>
                                                     <option value="<?php echo esc_attr($provider->name); ?>" <?php selected($rule->default_provider_name, $provider->name); ?>>
-                                                        <?php echo esc_html($provider->name); ?>
+                                                        <?php echo esc_html(ucfirst($provider->name)); ?>
                                                     </option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -127,10 +140,17 @@ function intellisend_render_routing_page_content()
                                                     <span class="status-inactive"><?php echo esc_html__('Inactive', 'intellisend'); ?></span>
                                                 <?php endif; ?>
                                             </span>
-                                            <select class="edit-mode rule-enabled" style="display:none;">
-                                                <option value="1" <?php selected($rule->enabled, 1); ?>><?php echo esc_html__('Active', 'intellisend'); ?></option>
-                                                <option value="0" <?php selected($rule->enabled, 0); ?>><?php echo esc_html__('Inactive', 'intellisend'); ?></option>
-                                            </select>
+                                            <?php if ($is_default_rule) : ?>
+                                                <select class="edit-mode rule-enabled" style="display:none;" disabled>
+                                                    <option value="1" <?php selected($rule->enabled, 1); ?>><?php echo esc_html__('Active', 'intellisend'); ?></option>
+                                                    <option value="0" <?php selected($rule->enabled, 0); ?>><?php echo esc_html__('Inactive', 'intellisend'); ?></option>
+                                                </select>
+                                            <?php else : ?>
+                                                <select class="edit-mode rule-enabled" style="display:none;">
+                                                    <option value="1" <?php selected($rule->enabled, 1); ?>><?php echo esc_html__('Active', 'intellisend'); ?></option>
+                                                    <option value="0" <?php selected($rule->enabled, 0); ?>><?php echo esc_html__('Inactive', 'intellisend'); ?></option>
+                                                </select>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="editable" data-field="antispam">
                                             <span class="view-mode">
@@ -159,21 +179,21 @@ function intellisend_render_routing_page_content()
                                                     <span class="dashicons dashicons-no"></span>
                                                 </button>
                                                 
-                                                <button type="button" class="action-button duplicate-rule" title="<?php echo esc_attr__('Duplicate', 'intellisend'); ?>">
-                                                    <span class="dashicons dashicons-admin-page"></span>
-                                                </button>
-                                                
-                                                <?php if ($rule->enabled) : ?>
-                                                    <button type="button" class="action-button deactivate-rule" data-id="<?php echo esc_attr($rule->id); ?>" title="<?php echo esc_attr__('Deactivate', 'intellisend'); ?>">
-                                                        <span class="dashicons dashicons-hidden"></span>
-                                                    </button>
-                                                <?php else : ?>
-                                                    <button type="button" class="action-button activate-rule" data-id="<?php echo esc_attr($rule->id); ?>" title="<?php echo esc_attr__('Activate', 'intellisend'); ?>">
-                                                        <span class="dashicons dashicons-visibility"></span>
-                                                    </button>
-                                                <?php endif; ?>
-                                                
                                                 <?php if (!$is_default_rule) : ?>
+                                                    <button type="button" class="action-button duplicate-rule" title="<?php echo esc_attr__('Duplicate', 'intellisend'); ?>">
+                                                        <span class="dashicons dashicons-admin-page"></span>
+                                                    </button>
+                                                    
+                                                    <?php if ($rule->enabled) : ?>
+                                                        <button type="button" class="action-button deactivate-rule" data-id="<?php echo esc_attr($rule->id); ?>" title="<?php echo esc_attr__('Deactivate', 'intellisend'); ?>">
+                                                            <span class="dashicons dashicons-hidden"></span>
+                                                        </button>
+                                                    <?php else : ?>
+                                                        <button type="button" class="action-button activate-rule" data-id="<?php echo esc_attr($rule->id); ?>" title="<?php echo esc_attr__('Activate', 'intellisend'); ?>">
+                                                            <span class="dashicons dashicons-visibility"></span>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                    
                                                     <button type="button" class="action-button delete-rule" data-id="<?php echo esc_attr($rule->id); ?>" data-name="<?php echo esc_attr($rule->name); ?>" title="<?php echo esc_attr__('Delete', 'intellisend'); ?>">
                                                         <span class="dashicons dashicons-trash"></span>
                                                     </button>
@@ -214,7 +234,7 @@ function intellisend_render_routing_page_content()
                     <option value=""><?php echo esc_html__('Select Provider', 'intellisend'); ?></option>
                     <?php foreach ($providers as $provider) : ?>
                         <option value="<?php echo esc_attr($provider->name); ?>">
-                            <?php echo esc_html($provider->name); ?>
+                            <?php echo esc_html(ucfirst($provider->name)); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -223,8 +243,10 @@ function intellisend_render_routing_page_content()
                 <span class="view-mode"></span>
                 <div class="edit-mode recipients-container">
                     <input type="text" class="rule-recipients-input" placeholder="<?php echo esc_attr__('Add email, press Enter', 'intellisend'); ?>">
-                    <div class="recipients-tags"></div>
-                    <input type="hidden" class="rule-recipients" value="">
+                    <div class="recipients-tags">
+                        <span class="recipient-tag"><?php echo esc_html($default_recipient); ?><span class="remove-recipient">×</span></span>
+                    </div>
+                    <input type="hidden" class="rule-recipients" value="<?php echo esc_attr($default_recipient); ?>">
                 </div>
             </td>
             <td class="editable" data-field="priority">

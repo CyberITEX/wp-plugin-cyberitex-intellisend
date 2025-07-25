@@ -1,3 +1,4 @@
+// cyberitex-intellisend/admin/js/routing-page.js
 /**
  * IntelliSend Routing Page JavaScript
  * 
@@ -120,8 +121,8 @@
          * Set up recipient tags functionality
          */
         setupRecipientTags: function() {
-            // Initial setup for existing tags
-            $('.recipients-container').each(function() {
+            // Initial setup for existing tags - skip for new rule template
+            $('.recipients-container').not('#new-rule-template .recipients-container').each(function() {
                 const $container = $(this);
                 const recipients = $container.find('.rule-recipients').val();
                 
@@ -142,14 +143,14 @@
         addRecipientTag: function($container, email) {
             // Validate email
             if (!this.emailRegex.test(email)) {
-                this.showError(intellisendData.strings.invalidRecipient);
+                this.showError('Invalid email address format: ' + email);
                 return false;
             }
             
             // Check if already exists
             let alreadyExists = false;
             $container.find('.recipient-tag').each(function() {
-                if ($(this).text().replace('×', '') === email) {
+                if ($(this).text().replace('×', '').trim() === email) {
                     alreadyExists = true;
                     return false;
                 }
@@ -176,7 +177,7 @@
             const recipients = [];
             
             $container.find('.recipient-tag').each(function() {
-                recipients.push($(this).text().replace('×', ''));
+                recipients.push($(this).text().replace('×', '').trim());
             });
             
             $container.find('.rule-recipients').val(recipients.join(','));
@@ -191,10 +192,10 @@
             const $newRow = $(template.content.cloneNode(true));
             
             // Append to table
-            $('#routing-rules-table').append($newRow);
+            $('#routing-rules-table tbody').append($newRow);
             
             // Show edit inputs by default
-            const $row = $('#routing-rules-table').find('.new-rule-row');
+            const $row = $('#routing-rules-table .new-rule-row');
             $row.find('.edit-mode').show();
             $row.find('.view-mode').hide();
             
@@ -206,8 +207,7 @@
          * Duplicate an existing rule
          */
         duplicateRule: function($row) {
-            const ruleId = $row.data('id');
-            const isDefault = $row.data('is-default');
+            const isDefault = $row.data('is-default') == 1;
             
             // Don't allow duplicating default rule
             if (isDefault) {
@@ -227,7 +227,8 @@
             $newRow.find('.rule-enabled').val($row.find('.rule-enabled').val());
             $newRow.find('.rule-antispam').val($row.find('.rule-antispam').val());
             
-            // Copy recipients
+            // Clear recipients and add from source
+            $newRow.find('.recipients-tags').empty();
             const recipients = $row.find('.rule-recipients').val();
             if (recipients) {
                 recipients.split(',').forEach((recipient) => {
@@ -254,8 +255,11 @@
             $row.find('.delete-rule').hide();
             $row.find('.save-rule, .cancel-edit').show();
             
-            // Focus on the name field
-            $row.find('.rule-name').focus();
+            // Focus on the name field (unless it's readonly for default rule)
+            const $nameField = $row.find('.rule-name');
+            if (!$nameField.prop('readonly')) {
+                $nameField.focus();
+            }
         },
         
         /**
@@ -268,8 +272,13 @@
                 $row.find('.rule-patterns').val($row.find('.view-mode[data-field="patterns"]').text());
                 $row.find('.rule-provider').val($row.find('.view-mode[data-field="provider"]').text());
                 $row.find('.rule-priority').val($row.find('.view-mode[data-field="priority"]').text());
-                $row.find('.rule-enabled').val($row.find('.rule-enabled option:contains("' + $row.find('.view-mode[data-field="enabled"] span').text() + '")').val());
-                $row.find('.rule-antispam').val($row.find('.rule-antispam option:contains("' + $row.find('.view-mode[data-field="antispam"] span').text() + '")').val());
+                
+                // Revert status selections
+                const enabledText = $row.find('.view-mode[data-field="enabled"] span').text();
+                $row.find('.rule-enabled').val(enabledText === 'Active' ? '1' : '0');
+                
+                const antispamText = $row.find('.view-mode[data-field="antispam"] span').text();
+                $row.find('.rule-antispam').val(antispamText === 'On' ? '1' : '0');
             } else {
                 // Update view mode with the new values
                 $row.find('.view-mode[data-field="name"]').text($row.find('.rule-name').val());
@@ -312,7 +321,7 @@
             }
             
             // Show delete button except for default rule
-            if ($row.data('is-default') !== 1) {
+            if ($row.data('is-default') != 1) {
                 $row.find('.delete-rule').show();
             }
         },
@@ -326,21 +335,21 @@
             $('.field-error').remove();
             
             let isValid = true;
-            const isDefaultRule = $row.data('is-default') === 1;
+            const isDefaultRule = $row.data('is-default') == 1;
             
             // Validate required fields
             if (!$row.find('.rule-name').val().trim()) {
-                this.showFieldError($row.find('.rule-name'), intellisendData.strings.requiredField);
+                this.showFieldError($row.find('.rule-name'), 'Rule name is required');
                 isValid = false;
             }
             
             if (!$row.find('.rule-patterns').val().trim()) {
-                this.showFieldError($row.find('.rule-patterns'), intellisendData.strings.requiredField);
+                this.showFieldError($row.find('.rule-patterns'), 'Subject patterns are required');
                 isValid = false;
             }
             
             if (!$row.find('.rule-provider').val()) {
-                this.showFieldError($row.find('.rule-provider'), intellisendData.strings.requiredField);
+                this.showFieldError($row.find('.rule-provider'), 'Provider is required');
                 isValid = false;
             }
             
@@ -370,7 +379,7 @@
         saveRule: function($row) {
             const self = this;
             const ruleId = $row.data('id');
-            const isDefault = $row.data('is-default') === 1;
+            const isDefault = $row.data('is-default') == 1;
             
             // Prepare the data
             const formData = {
@@ -403,9 +412,9 @@
                 success: function(response) {
                     if (response.success) {
                         self.exitEditMode($row, false);
-                        self.showSuccess(response.data || intellisendData.strings.saveSuccess);
+                        self.showSuccess(response.data || 'Routing rule updated successfully');
                     } else {
-                        const errorMsg = response.data || intellisendData.strings.saveFailed;
+                        const errorMsg = response.data || 'Failed to update routing rule';
                         self.showError(errorMsg);
                         console.error('Save Error:', response);
                     }
@@ -426,16 +435,14 @@
         saveNewRule: function($row) {
             const self = this;
             
-            // Prepare the data
-            const formData = {
-                name: $row.find('.rule-name').val().trim(),
-                subject_patterns: $row.find('.rule-patterns').val().trim(),
-                default_provider_name: $row.find('.rule-provider').val(),
-                recipients: $row.find('.rule-recipients').val(),
-                priority: $row.find('.rule-priority').val(),
-                enabled: $row.find('.rule-enabled').val(),
-                anti_spam_enabled: $row.find('.rule-antispam').val()
-            };
+            // Prepare the data for new rule
+            const formData = 'name=' + encodeURIComponent($row.find('.rule-name').val().trim()) + 
+                           '&subject_patterns=' + encodeURIComponent($row.find('.rule-patterns').val().trim()) +
+                           '&default_provider_name=' + encodeURIComponent($row.find('.rule-provider').val()) +
+                           '&recipients=' + encodeURIComponent($row.find('.rule-recipients').val()) +
+                           '&priority=' + encodeURIComponent($row.find('.rule-priority').val()) +
+                           '&enabled=' + encodeURIComponent($row.find('.rule-enabled').val()) +
+                           '&anti_spam_enabled=' + encodeURIComponent($row.find('.rule-antispam').val());
             
             // Show loading
             this.showLoading();
@@ -451,13 +458,13 @@
                 },
                 success: function(response) {
                     if (response.success) {
-                        self.showSuccess(response.data || intellisendData.strings.saveSuccess);
+                        self.showSuccess(response.data || 'Routing rule added successfully');
                         // Reload page to show new rule with proper ID
                         setTimeout(function() {
                             location.reload();
                         }, 1000);
                     } else {
-                        const errorMsg = response.data || intellisendData.strings.saveFailed;
+                        const errorMsg = response.data || 'Failed to add routing rule';
                         self.showError(errorMsg);
                     }
                 },
@@ -475,7 +482,7 @@
          * Confirm rule deletion
          */
         confirmDeleteRule: function(ruleId, ruleName) {
-            if (confirm(intellisendData.strings.confirmDelete.replace('{name}', ruleName))) {
+            if (confirm('Are you sure you want to delete the routing rule "' + ruleName + '"? This action cannot be undone.')) {
                 this.deleteRule(ruleId);
             }
         },
