@@ -27,8 +27,21 @@ register_deactivation_hook( __FILE__, 'intellisend_deactivate' );
  * The code that runs during plugin activation.
  */
 function intellisend_activate() {
+    // Prevent any hooks from running during activation
+    define( 'INTELLISEND_ACTIVATING', true );
+    
     require_once INTELLISEND_PLUGIN_DIR . 'includes/class-database.php';
     require_once INTELLISEND_PLUGIN_DIR . 'includes/class-activator.php';
+    
+    // Create database tables first
+    $result = IntelliSend_Database::create_tables();
+    
+    if ( !$result ) {
+        // Log error but don't prevent activation
+        error_log( 'IntelliSend: Database tables creation failed during activation' );
+    }
+    
+    // Run activator
     IntelliSend_Activator::activate();
 }
 
@@ -49,5 +62,7 @@ function run_intellisend() {
     $plugin->run();
 }
 
-// Start the plugin
-run_intellisend();
+// Start the plugin immediately, but prevent form hooks during activation
+if ( ! defined( 'INTELLISEND_ACTIVATING' ) ) {
+    run_intellisend();
+}

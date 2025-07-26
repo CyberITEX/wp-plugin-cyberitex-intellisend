@@ -20,7 +20,6 @@ if (!defined('WPINC')) {
  */
 class IntelliSend_Ajax
 {
-
     /**
      * Initialize AJAX hooks
      */
@@ -45,6 +44,46 @@ class IntelliSend_Ajax
 
         // Enqueue scripts
         add_action('admin_enqueue_scripts', array(__CLASS__, 'enqueue_scripts'));
+    }
+
+    /**
+     * Check if debug mode is enabled from database settings (safe version)
+     */
+    private static function is_debug_enabled()
+    {
+        // Don't try to access database during activation
+        if ( defined( 'INTELLISEND_ACTIVATING' ) ) {
+            return false;
+        }
+        
+        // Check if tables exist before trying to query
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'intellisend_settings';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
+        
+        if ( !$table_exists ) {
+            return false;
+        }
+        
+        try {
+            $settings = IntelliSend_Database::get_settings();
+            return $settings && isset($settings->debug_enabled) ? (bool) $settings->debug_enabled : false;
+        } catch ( Exception $e ) {
+            // Fallback to false if any error occurs
+            return false;
+        }
+    }
+
+    /**
+     * Debug logging with database-driven enable/disable
+     */
+    private static function debug_log($message)
+    {
+        if (self::is_debug_enabled()) {
+            error_log('IntelliSend AJAX Debug: ' . $message);
+        }
     }
 
     /**
@@ -177,6 +216,12 @@ class IntelliSend_Ajax
                 $update_data['testRecipient'] = sanitize_email($setting_value);
                 break;
 
+            case 'debug_enabled':
+                // Handle debug toggle - convert to integer (0 or 1)
+                $debug_value = ($setting_value === 'true' || $setting_value === '1' || $setting_value === 1) ? 1 : 0;
+                $update_data['debug_enabled'] = $debug_value;
+                break;
+
             default:
                 wp_send_json_error(array('message' => esc_html__('Invalid setting name.', 'intellisend')));
                 return;
@@ -186,7 +231,16 @@ class IntelliSend_Ajax
         $result = IntelliSend_Database::update_settings($update_data);
 
         if ($result) {
-            wp_send_json_success(array('message' => esc_html__('Setting saved successfully.', 'intellisend')));
+            // For debug toggle, return additional info about the new state
+            if ($setting_name === 'debug_enabled') {
+                $new_state = $update_data['debug_enabled'] ? 'enabled' : 'disabled';
+                wp_send_json_success(array(
+                    'message' => sprintf(esc_html__('Debug mode %s.', 'intellisend'), $new_state),
+                    'debug_state' => $update_data['debug_enabled']
+                ));
+            } else {
+                wp_send_json_success(array('message' => esc_html__('Setting saved successfully.', 'intellisend')));
+            }
         } else {
             wp_send_json_error(array('message' => esc_html__('Failed to save setting.', 'intellisend')));
         }
@@ -391,10 +445,13 @@ class IntelliSend_Ajax
                 $phpmailer->SMTPAuth = false;
             }
 
-            $phpmailer->SMTPDebug = 2;
-            $phpmailer->Debugoutput = function ($str, $level) use (&$debug_output) {
-                $debug_output .= $str . "\n";
-            };
+            // Use debug setting from database
+            if (self::is_debug_enabled()) {
+                $phpmailer->SMTPDebug = 2;
+                $phpmailer->Debugoutput = function ($str, $level) use (&$debug_output) {
+                    $debug_output .= $str . "\n";
+                };
+            }
         });
 
         // Set a flag to bypass the mail interception for test emails
@@ -529,33 +586,43 @@ class IntelliSend_Ajax
     public static function handle_add_routing_rule()
     {
         // Enable debugging
-        error_log('=== INTELLISEND ADD ROUTING RULE START ===');
-        error_log('POST data: ' . print_r($_POST, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('=== INTELLISEND ADD ROUTING RULE START ===');
+            self::debug_log('POST data: ' . print_r($_POST, true));
+        }
 
         // Check nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
-            error_log('IntelliSend: Nonce validation failed in handle_add_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Nonce validation failed in handle_add_routing_rule');
+            }
             wp_send_json_error('Security check failed.');
             return;
         }
 
         // Check capabilities
         if (!current_user_can('manage_options')) {
-            error_log('IntelliSend: Permission check failed in handle_add_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Permission check failed in handle_add_routing_rule');
+            }
             wp_send_json_error('You do not have permission to perform this action.');
             return;
         }
 
         // Get form data
         if (!isset($_POST['formData'])) {
-            error_log('IntelliSend: No form data provided in handle_add_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('No form data provided in handle_add_routing_rule');
+            }
             wp_send_json_error('Invalid form data.');
             return;
         }
 
         $formData = array();
         parse_str($_POST['formData'], $formData);
-        error_log('IntelliSend: Parsed form data: ' . print_r($formData, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Parsed form data: ' . print_r($formData, true));
+        }
 
         // Validate required fields
         if (empty($formData['name'])) {
@@ -579,7 +646,9 @@ class IntelliSend_Ajax
         if (!in_array($pattern_type, $valid_pattern_types)) {
             $pattern_type = 'wildcard';
         }
-        error_log('IntelliSend: Add - Pattern type after validation: ' . $pattern_type);
+        if (self::is_debug_enabled()) {
+            self::debug_log('Add - Pattern type after validation: ' . $pattern_type);
+        }
 
         // Prepare rule data
         $rule = new stdClass();
@@ -592,19 +661,27 @@ class IntelliSend_Ajax
         $rule->enabled = isset($formData['enabled']) ? absint($formData['enabled']) : 1;
         $rule->anti_spam_enabled = isset($formData['anti_spam_enabled']) ? absint($formData['anti_spam_enabled']) : 1;
 
-        error_log('IntelliSend: Add - Final rule object: ' . print_r($rule, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Add - Final rule object: ' . print_r($rule, true));
+        }
 
         // Create the routing rule
         $result = IntelliSend_Database::create_routing_rule($rule);
-        error_log('IntelliSend: Add - Database result: ' . var_export($result, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Add - Database result: ' . var_export($result, true));
+        }
 
         if (!$result) {
-            error_log('IntelliSend: Failed to create routing rule in database');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Failed to create routing rule in database');
+            }
             wp_send_json_error('Failed to add routing rule. Database operation failed.');
             return;
         }
 
-        error_log('=== INTELLISEND ADD ROUTING RULE SUCCESS ===');
+        if (self::is_debug_enabled()) {
+            self::debug_log('=== INTELLISEND ADD ROUTING RULE SUCCESS ===');
+        }
         wp_send_json_success('Routing rule added successfully.');
     }
 
@@ -614,48 +691,64 @@ class IntelliSend_Ajax
     public static function handle_update_routing_rule()
     {
         // Enable detailed debugging
-        error_log('=== INTELLISEND UPDATE ROUTING RULE START ===');
-        error_log('POST data: ' . print_r($_POST, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('=== INTELLISEND UPDATE ROUTING RULE START ===');
+            self::debug_log('POST data: ' . print_r($_POST, true));
+        }
 
         // Check nonce
         if (!isset($_POST['nonce'])) {
-            error_log('IntelliSend: No nonce provided in handle_update_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('No nonce provided in handle_update_routing_rule');
+            }
             wp_send_json_error('Security check failed - no nonce provided.');
             return;
         }
 
         $received_nonce = $_POST['nonce'];
-        error_log('IntelliSend: Received nonce: ' . $received_nonce);
+        if (self::is_debug_enabled()) {
+            self::debug_log('Received nonce: ' . $received_nonce);
+        }
 
         // Try both the routing nonce and the ajax nonce for backward compatibility
         $is_routing_nonce_valid = wp_verify_nonce($received_nonce, 'intellisend_routing_nonce');
         $is_ajax_nonce_valid = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
 
-        error_log('IntelliSend: Routing nonce valid: ' . ($is_routing_nonce_valid ? 'true' : 'false'));
-        error_log('IntelliSend: Ajax nonce valid: ' . ($is_ajax_nonce_valid ? 'true' : 'false'));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Routing nonce valid: ' . ($is_routing_nonce_valid ? 'true' : 'false'));
+            self::debug_log('Ajax nonce valid: ' . ($is_ajax_nonce_valid ? 'true' : 'false'));
+        }
 
         if (!$is_routing_nonce_valid && !$is_ajax_nonce_valid) {
-            error_log('IntelliSend: Invalid nonce in handle_update_routing_rule: ' . $received_nonce);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Invalid nonce in handle_update_routing_rule: ' . $received_nonce);
+            }
             wp_send_json_error('Security check failed. Please refresh the page and try again.');
             return;
         }
 
         // Check capabilities
         if (!current_user_can('manage_options')) {
-            error_log('IntelliSend: Permission check failed in handle_update_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Permission check failed in handle_update_routing_rule');
+            }
             wp_send_json_error('You do not have permission to perform this action.');
             return;
         }
 
         // Get form data
         if (!isset($_POST['formData'])) {
-            error_log('IntelliSend: No form data provided in handle_update_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('No form data provided in handle_update_routing_rule');
+            }
             wp_send_json_error('Invalid form data.');
             return;
         }
 
         $formData = $_POST['formData'];
-        error_log('IntelliSend: Raw formData: ' . print_r($formData, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Raw formData: ' . print_r($formData, true));
+        }
 
         // Parse form data if it's a string
         if (is_string($formData)) {
@@ -664,27 +757,37 @@ class IntelliSend_Ajax
             $formData = $parsed_data;
         }
 
-        error_log('IntelliSend: Parsed form data: ' . print_r($formData, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Parsed form data: ' . print_r($formData, true));
+        }
 
         // Validate rule ID
         if (empty($formData['id'])) {
-            error_log('IntelliSend: No rule ID provided');
+            if (self::is_debug_enabled()) {
+                self::debug_log('No rule ID provided');
+            }
             wp_send_json_error('Rule ID is required.');
             return;
         }
 
         $rule_id = intval($formData['id']);
-        error_log('IntelliSend: Rule ID: ' . $rule_id);
+        if (self::is_debug_enabled()) {
+            self::debug_log('Rule ID: ' . $rule_id);
+        }
 
         // Validate required fields
         if (empty($formData['name'])) {
-            error_log('IntelliSend: Rule name is empty');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Rule name is empty');
+            }
             wp_send_json_error('Rule name is required.');
             return;
         }
 
         if (empty($formData['default_provider_name'])) {
-            error_log('IntelliSend: Provider name is empty');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Provider name is empty');
+            }
             wp_send_json_error('Provider is required.');
             return;
         }
@@ -692,20 +795,28 @@ class IntelliSend_Ajax
         // Get existing rule
         $existing_rule = IntelliSend_Database::get_routing_rule($rule_id);
         if (!$existing_rule) {
-            error_log('IntelliSend: Rule not found with ID: ' . $rule_id);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Rule not found with ID: ' . $rule_id);
+            }
             wp_send_json_error('Rule not found.');
             return;
         }
 
-        error_log('IntelliSend: Existing rule: ' . print_r($existing_rule, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Existing rule: ' . print_r($existing_rule, true));
+        }
 
         // Check if it's a default rule
         $is_default_rule = ($rule_id == 1 || $existing_rule->priority == -1 || (isset($existing_rule->is_default) && $existing_rule->is_default == 1));
-        error_log('IntelliSend: Is default rule: ' . ($is_default_rule ? 'true' : 'false'));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Is default rule: ' . ($is_default_rule ? 'true' : 'false'));
+        }
 
         // For non-default rules, validate subject patterns
         if (!$is_default_rule && empty($formData['subject_patterns'])) {
-            error_log('IntelliSend: Subject patterns required for non-default rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Subject patterns required for non-default rule');
+            }
             wp_send_json_error('At least one pattern is required.');
             return;
         }
@@ -716,9 +827,11 @@ class IntelliSend_Ajax
         if (!in_array($pattern_type, $valid_pattern_types)) {
             $pattern_type = 'wildcard';
         }
-        error_log('IntelliSend: Pattern type after validation: ' . $pattern_type);
-        error_log('IntelliSend: Valid pattern types: ' . print_r($valid_pattern_types, true));
-        error_log('IntelliSend: Original pattern_type from form: ' . (isset($formData['pattern_type']) ? $formData['pattern_type'] : 'NOT_SET'));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Pattern type after validation: ' . $pattern_type);
+            self::debug_log('Valid pattern types: ' . print_r($valid_pattern_types, true));
+            self::debug_log('Original pattern_type from form: ' . (isset($formData['pattern_type']) ? $formData['pattern_type'] : 'NOT_SET'));
+        }
 
         // Prepare rule data object
         $rule = new stdClass();
@@ -735,62 +848,84 @@ class IntelliSend_Ajax
             // For default rule, keep fixed values but allow pattern type to be updated
             $rule->subject_patterns = '*';
             $rule->priority = -1;
-            error_log('IntelliSend: Default rule - using fixed patterns and priority, but allowing pattern_type: ' . $rule->pattern_type);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Default rule - using fixed patterns and priority, but allowing pattern_type: ' . $rule->pattern_type);
+            }
         } else {
             // For regular rules, use provided values
             $rule->subject_patterns = sanitize_textarea_field($formData['subject_patterns']);
             $rule->priority = isset($formData['priority']) ? intval($formData['priority']) : $existing_rule->priority;
-            error_log('IntelliSend: Regular rule - using provided patterns: ' . $rule->subject_patterns . ', pattern_type: ' . $rule->pattern_type);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Regular rule - using provided patterns: ' . $rule->subject_patterns . ', pattern_type: ' . $rule->pattern_type);
+            }
         }
 
-        error_log('IntelliSend: Final rule object: ' . print_r($rule, true));
-        error_log('IntelliSend: Rule pattern_type specifically: "' . $rule->pattern_type . '"');
-        error_log('IntelliSend: Rule pattern_type type: ' . gettype($rule->pattern_type));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Final rule object: ' . print_r($rule, true));
+            self::debug_log('Rule pattern_type specifically: "' . $rule->pattern_type . '"');
+            self::debug_log('Rule pattern_type type: ' . gettype($rule->pattern_type));
+        }
 
         // Check the current pattern_type in database BEFORE update
         global $wpdb;
         $table = $wpdb->prefix . 'intellisend_routing';
         $current_db_rule = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $rule_id));
-        error_log('IntelliSend: Current rule in DB BEFORE update: ' . print_r($current_db_rule, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Current rule in DB BEFORE update: ' . print_r($current_db_rule, true));
+        }
 
         // Verify database classes are available
         if (!class_exists('IntelliSend_Database')) {
-            error_log('IntelliSend: IntelliSend_Database class not found');
+            if (self::is_debug_enabled()) {
+                self::debug_log('IntelliSend_Database class not found');
+            }
             wp_send_json_error('Database class not available.');
             return;
         }
 
         if (!method_exists('IntelliSend_Database', 'update_routing_rule')) {
-            error_log('IntelliSend: update_routing_rule method not found');
+            if (self::is_debug_enabled()) {
+                self::debug_log('update_routing_rule method not found');
+            }
             wp_send_json_error('Database method not available.');
             return;
         }
 
         // Update rule
-        error_log('IntelliSend: Calling IntelliSend_Database::update_routing_rule');
+        if (self::is_debug_enabled()) {
+            self::debug_log('Calling IntelliSend_Database::update_routing_rule');
+        }
         $result = IntelliSend_Database::update_routing_rule($rule);
-        error_log('IntelliSend: Update result: ' . var_export($result, true));
+        if (self::is_debug_enabled()) {
+            self::debug_log('Update result: ' . var_export($result, true));
+        }
 
         // Check the pattern_type in database AFTER update
         $updated_db_rule = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $rule_id));
-        error_log('IntelliSend: Updated rule in DB AFTER update: ' . print_r($updated_db_rule, true));
-        error_log('IntelliSend: Pattern type changed from "' . ($current_db_rule ? $current_db_rule->pattern_type : 'NULL') . '" to "' . ($updated_db_rule ? $updated_db_rule->pattern_type : 'NULL') . '"');
+        if (self::is_debug_enabled()) {
+            self::debug_log('Updated rule in DB AFTER update: ' . print_r($updated_db_rule, true));
+            self::debug_log('Pattern type changed from "' . ($current_db_rule ? $current_db_rule->pattern_type : 'NULL') . '" to "' . ($updated_db_rule ? $updated_db_rule->pattern_type : 'NULL') . '"');
+        }
 
         if ($result === false) {
-            error_log('IntelliSend: Database error in handle_update_routing_rule');
-            
-            // Get additional debugging info
-            if ($wpdb->last_error) {
-                error_log('IntelliSend: WordPress database error: ' . $wpdb->last_error);
-                error_log('IntelliSend: Last query: ' . $wpdb->last_query);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Database error in handle_update_routing_rule');
+
+                // Get additional debugging info
+                if ($wpdb->last_error) {
+                    self::debug_log('WordPress database error: ' . $wpdb->last_error);
+                    self::debug_log('Last query: ' . $wpdb->last_query);
+                }
             }
-            
+
             wp_send_json_error('Failed to update routing rule. Database operation failed.');
             return;
         }
 
-        error_log('IntelliSend: Rule updated successfully');
-        error_log('=== INTELLISEND UPDATE ROUTING RULE SUCCESS ===');
+        if (self::is_debug_enabled()) {
+            self::debug_log('Rule updated successfully');
+            self::debug_log('=== INTELLISEND UPDATE ROUTING RULE SUCCESS ===');
+        }
 
         wp_send_json_success('Routing rule updated successfully.');
     }
@@ -802,14 +937,18 @@ class IntelliSend_Ajax
     {
         // Check nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
-            error_log('IntelliSend: Nonce validation failed in handle_delete_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Nonce validation failed in handle_delete_routing_rule');
+            }
             wp_send_json_error('Security check failed.');
             return;
         }
 
         // Check capabilities
         if (!current_user_can('manage_options')) {
-            error_log('IntelliSend: Permission check failed in handle_delete_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Permission check failed in handle_delete_routing_rule');
+            }
             wp_send_json_error('You do not have permission to perform this action.');
             return;
         }
@@ -817,7 +956,9 @@ class IntelliSend_Ajax
         // Get rule ID
         $rule_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
         if (!$rule_id) {
-            error_log('IntelliSend: Invalid rule ID in handle_delete_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Invalid rule ID in handle_delete_routing_rule');
+            }
             wp_send_json_error('Invalid rule ID.');
             return;
         }
@@ -825,7 +966,9 @@ class IntelliSend_Ajax
         // Delete rule
         $result = IntelliSend_Database::delete_routing_rule($rule_id);
         if (!$result) {
-            error_log('IntelliSend: Failed to delete routing rule: ' . $rule_id);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Failed to delete routing rule: ' . $rule_id);
+            }
             wp_send_json_error('Failed to delete routing rule. Database operation failed.');
             return;
         }
@@ -841,14 +984,18 @@ class IntelliSend_Ajax
     {
         // Check nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
-            error_log('IntelliSend: Nonce validation failed in handle_activate_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Nonce validation failed in handle_activate_routing_rule');
+            }
             wp_send_json_error('Security check failed.');
             return;
         }
 
         // Check capabilities
         if (!current_user_can('manage_options')) {
-            error_log('IntelliSend: Permission check failed in handle_activate_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Permission check failed in handle_activate_routing_rule');
+            }
             wp_send_json_error('You do not have permission to perform this action.');
             return;
         }
@@ -856,7 +1003,9 @@ class IntelliSend_Ajax
         // Get rule ID
         $rule_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
         if (!$rule_id) {
-            error_log('IntelliSend: Invalid rule ID in handle_activate_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Invalid rule ID in handle_activate_routing_rule');
+            }
             wp_send_json_error('Invalid rule ID.');
             return;
         }
@@ -864,7 +1013,9 @@ class IntelliSend_Ajax
         // Get rule data
         $rule = IntelliSend_Database::get_routing_rule($rule_id);
         if (!$rule) {
-            error_log('IntelliSend: Rule not found in handle_activate_routing_rule: ' . $rule_id);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Rule not found in handle_activate_routing_rule: ' . $rule_id);
+            }
             wp_send_json_error('Rule not found.');
             return;
         }
@@ -873,7 +1024,9 @@ class IntelliSend_Ajax
         $rule->enabled = 1;
         $result = IntelliSend_Database::update_routing_rule($rule);
         if (!$result) {
-            error_log('IntelliSend: Failed to activate routing rule: ' . $rule_id);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Failed to activate routing rule: ' . $rule_id);
+            }
             wp_send_json_error('Failed to activate routing rule. Database operation failed.');
             return;
         }
@@ -889,14 +1042,18 @@ class IntelliSend_Ajax
     {
         // Check nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
-            error_log('IntelliSend: Nonce validation failed in handle_deactivate_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Nonce validation failed in handle_deactivate_routing_rule');
+            }
             wp_send_json_error('Security check failed.');
             return;
         }
 
         // Check capabilities
         if (!current_user_can('manage_options')) {
-            error_log('IntelliSend: Permission check failed in handle_deactivate_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Permission check failed in handle_deactivate_routing_rule');
+            }
             wp_send_json_error('You do not have permission to perform this action.');
             return;
         }
@@ -904,7 +1061,9 @@ class IntelliSend_Ajax
         // Get rule ID
         $rule_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
         if (!$rule_id) {
-            error_log('IntelliSend: Invalid rule ID in handle_deactivate_routing_rule');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Invalid rule ID in handle_deactivate_routing_rule');
+            }
             wp_send_json_error('Invalid rule ID.');
             return;
         }
@@ -912,7 +1071,9 @@ class IntelliSend_Ajax
         // Get rule data
         $rule = IntelliSend_Database::get_routing_rule($rule_id);
         if (!$rule) {
-            error_log('IntelliSend: Rule not found in handle_deactivate_routing_rule: ' . $rule_id);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Rule not found in handle_deactivate_routing_rule: ' . $rule_id);
+            }
             wp_send_json_error('Rule not found.');
             return;
         }
@@ -921,7 +1082,9 @@ class IntelliSend_Ajax
         $rule->enabled = 0;
         $result = IntelliSend_Database::update_routing_rule($rule);
         if (!$result) {
-            error_log('IntelliSend: Failed to deactivate routing rule: ' . $rule_id);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Failed to deactivate routing rule: ' . $rule_id);
+            }
             wp_send_json_error('Failed to deactivate routing rule. Database operation failed.');
             return;
         }
@@ -937,7 +1100,9 @@ class IntelliSend_Ajax
     {
         // Check permissions first
         if (!current_user_can('manage_options')) {
-            error_log('IntelliSend: Permission check failed in handle_get_report');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Permission check failed in handle_get_report');
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('You do not have permission to perform this action.', 'intellisend')
             ));
@@ -946,7 +1111,9 @@ class IntelliSend_Ajax
 
         // Verify nonce
         if (!isset($_POST['nonce'])) {
-            error_log('IntelliSend: No nonce provided in handle_get_report');
+            if (self::is_debug_enabled()) {
+                self::debug_log('No nonce provided in handle_get_report');
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('Security check failed - no nonce provided.', 'intellisend')
             ));
@@ -960,7 +1127,9 @@ class IntelliSend_Ajax
         $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
 
         if (!$is_valid_nonce && $received_nonce !== $known_legacy_nonce) {
-            error_log('IntelliSend: Invalid nonce in handle_get_report: ' . $received_nonce);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Invalid nonce in handle_get_report: ' . $received_nonce);
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('Security check failed. Please refresh the page and try again.', 'intellisend')
             ));
@@ -970,7 +1139,9 @@ class IntelliSend_Ajax
         // Get report ID
         $report_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
         if (!$report_id) {
-            error_log('IntelliSend: Invalid report ID in handle_get_report');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Invalid report ID in handle_get_report');
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('Invalid report ID.', 'intellisend')
             ));
@@ -978,12 +1149,16 @@ class IntelliSend_Ajax
         }
 
         try {
-            error_log('IntelliSend: Attempting to get report with ID: ' . $report_id);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Attempting to get report with ID: ' . $report_id);
+            }
 
             // Get report from database
             $report = IntelliSend_Database::get_report($report_id);
             if (!$report) {
-                error_log('IntelliSend: Report not found with ID: ' . $report_id);
+                if (self::is_debug_enabled()) {
+                    self::debug_log('Report not found with ID: ' . $report_id);
+                }
                 wp_send_json_error(array(
                     'message' => esc_html__('Report not found.', 'intellisend')
                 ));
@@ -1017,11 +1192,15 @@ class IntelliSend_Ajax
             );
 
             // Log the response for debugging
-            error_log('IntelliSend: Report data successfully retrieved for ID: ' . $report_id);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Report data successfully retrieved for ID: ' . $report_id);
+            }
 
             wp_send_json_success($report_data);
         } catch (Exception $e) {
-            error_log('IntelliSend Error: ' . $e->getMessage());
+            if (self::is_debug_enabled()) {
+                self::debug_log('Error: ' . $e->getMessage());
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('An error occurred while retrieving the report.', 'intellisend'),
                 'error' => $e->getMessage()
@@ -1180,7 +1359,9 @@ class IntelliSend_Ajax
     {
         // Check permissions first
         if (!current_user_can('manage_options')) {
-            error_log('IntelliSend: Permission check failed in handle_delete_reports');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Permission check failed in handle_delete_reports');
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('You do not have permission to perform this action.', 'intellisend')
             ));
@@ -1189,7 +1370,9 @@ class IntelliSend_Ajax
 
         // Verify nonce
         if (!isset($_POST['nonce'])) {
-            error_log('IntelliSend: No nonce provided in handle_delete_reports');
+            if (self::is_debug_enabled()) {
+                self::debug_log('No nonce provided in handle_delete_reports');
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('Security check failed - no nonce provided.', 'intellisend')
             ));
@@ -1203,7 +1386,9 @@ class IntelliSend_Ajax
         $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
 
         if (!$is_valid_nonce && $received_nonce !== $known_legacy_nonce) {
-            error_log('IntelliSend: Invalid nonce in handle_delete_reports: ' . $received_nonce);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Invalid nonce in handle_delete_reports: ' . $received_nonce);
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('Security check failed. Please refresh the page and try again.', 'intellisend')
             ));
@@ -1235,7 +1420,9 @@ class IntelliSend_Ajax
         $result = $wpdb->query($query);
 
         if ($result === false) {
-            error_log('IntelliSend: Database error in handle_delete_reports: ' . $wpdb->last_error);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Database error in handle_delete_reports: ' . $wpdb->last_error);
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('Database error occurred while deleting reports.', 'intellisend')
             ));
@@ -1254,7 +1441,9 @@ class IntelliSend_Ajax
     {
         // Check permissions first
         if (!current_user_can('manage_options')) {
-            error_log('IntelliSend: Permission check failed in handle_delete_all_reports');
+            if (self::is_debug_enabled()) {
+                self::debug_log('Permission check failed in handle_delete_all_reports');
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('You do not have permission to perform this action.', 'intellisend')
             ));
@@ -1263,7 +1452,9 @@ class IntelliSend_Ajax
 
         // Verify nonce
         if (!isset($_POST['nonce'])) {
-            error_log('IntelliSend: No nonce provided in handle_delete_all_reports');
+            if (self::is_debug_enabled()) {
+                self::debug_log('No nonce provided in handle_delete_all_reports');
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('Security check failed - no nonce provided.', 'intellisend')
             ));
@@ -1277,7 +1468,9 @@ class IntelliSend_Ajax
         $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
 
         if (!$is_valid_nonce && $received_nonce !== $known_legacy_nonce) {
-            error_log('IntelliSend: Invalid nonce in handle_delete_all_reports: ' . $received_nonce);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Invalid nonce in handle_delete_all_reports: ' . $received_nonce);
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('Security check failed. Please refresh the page and try again.', 'intellisend')
             ));
@@ -1291,7 +1484,9 @@ class IntelliSend_Ajax
         $result = $wpdb->query("TRUNCATE TABLE $table_name");
 
         if ($result === false) {
-            error_log('IntelliSend: Database error in handle_delete_all_reports: ' . $wpdb->last_error);
+            if (self::is_debug_enabled()) {
+                self::debug_log('Database error in handle_delete_all_reports: ' . $wpdb->last_error);
+            }
             wp_send_json_error(array(
                 'message' => esc_html__('Database error occurred while deleting all reports.', 'intellisend')
             ));
@@ -1301,5 +1496,26 @@ class IntelliSend_Ajax
         wp_send_json_success(array(
             'message' => esc_html__('All reports deleted successfully.', 'intellisend')
         ));
+    }
+
+    /**
+     * Handle save routing rule AJAX request (legacy compatibility)
+     */
+    public static function handle_save_routing_rule()
+    {
+        // This method exists for backward compatibility but routes to appropriate add/update methods
+        if (isset($_POST['id']) && !empty($_POST['id'])) {
+            self::handle_update_routing_rule();
+        } else {
+            self::handle_add_routing_rule();
+        }
+    }
+
+    /**
+     * Get current debug mode status (for compatibility)
+     */
+    public static function get_debug_status()
+    {
+        return self::is_debug_enabled();
     }
 }

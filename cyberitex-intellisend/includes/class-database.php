@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * includes\class-database.php
  * IntelliSend Database Operations
  *
  * @package IntelliSend
@@ -310,6 +311,7 @@ class IntelliSend_Database
                 testRecipient varchar(255),
                 spamTestMessage text,
                 logsRetentionDays int(11) DEFAULT 365,
+                debug_enabled tinyint(1) DEFAULT 0,
                 PRIMARY KEY  (id)
             ) $charset_collate;";
             dbDelta($sql);
@@ -328,6 +330,7 @@ class IntelliSend_Database
                         'testRecipient' => $admin_email,
                         'spamTestMessage' => 'CONGRATULATIONS! You have been selected to receive a FREE $500 Gift Card! Click here to claim: http://claim-your-prize-now.example.com Limited time offer! Reply now or call +1-555-123-4567. This is a one-time message, to unsubscribe reply STOP.',
                         'logsRetentionDays' => 365,
+                        'debug_enabled' => 0,
                     )
                 );
             }
@@ -735,6 +738,7 @@ class IntelliSend_Database
                     'testRecipient' => isset($data['testRecipient']) ? sanitize_email($data['testRecipient']) : '',
                     'spamTestMessage' => isset($data['spamTestMessage']) ? sanitize_textarea_field($data['spamTestMessage']) : '',
                     'logsRetentionDays' => isset($data['logsRetentionDays']) ? absint($data['logsRetentionDays']) : 365,
+                    'debug_enabled' => isset($data['debug_enabled']) ? absint($data['debug_enabled']) : 0,
                 )
             );
 
@@ -765,6 +769,10 @@ class IntelliSend_Database
 
             if (isset($data['logsRetentionDays'])) {
                 $update_data['logsRetentionDays'] = absint($data['logsRetentionDays']);
+            }
+
+            if (isset($data['debug_enabled'])) {
+                $update_data['debug_enabled'] = absint($data['debug_enabled']);
             }
 
             return $wpdb->update(

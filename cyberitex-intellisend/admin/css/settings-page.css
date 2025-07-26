@@ -7,8 +7,8 @@
 
 /* General Styles */
 .intellisend-settings-wrap {
-    max-width: 1200px;
-    margin: 20px 0;
+    max-width: 100%;
+    margin: 0px 10px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     color: #1e1e1e;
 }

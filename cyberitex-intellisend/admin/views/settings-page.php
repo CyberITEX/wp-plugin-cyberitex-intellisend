@@ -1,5 +1,7 @@
 <?php
+
 /**
+ * admin\views\settings-page.php
  * IntelliSend Settings Page
  *
  * @package IntelliSend
@@ -13,33 +15,34 @@ if (!defined('WPINC')) {
 /**
  * Render the IntelliSend settings page content
  */
-function intellisend_render_settings_page_content() {
+function intellisend_render_settings_page_content()
+{
     // Get settings
     $settings = IntelliSend_Database::get_settings();
 
     // Get providers
-    $providers = IntelliSend_Database::get_providers(array( 'configured' => 1 ));
-    
+    $providers = IntelliSend_Database::get_providers(array('configured' => 1));
+
     // Enqueue the IntelliSendToast script
     wp_enqueue_script(
         'intellisend-toast',
         INTELLISEND_PLUGIN_URL . 'admin/js/intellisend-toast.js',
-        array( 'jquery' ),
+        array('jquery'),
         INTELLISEND_VERSION,
         true
     );
-    ?>
+?>
     <div class="wrap intellisend-settings-wrap">
         <h1><?php echo esc_html__('IntelliSend Settings', 'intellisend'); ?></h1>
-        
+
         <?php wp_nonce_field('intellisend_settings', 'intellisend_settings_nonce'); ?>
-        
+
         <!-- Auto-Save Settings Container -->
         <div class="intellisend-settings-container">
             <!-- General Settings Section (Auto-Save) -->
             <div class="intellisend-settings-section">
                 <h2 class="intellisend-settings-section-title"><?php echo esc_html__('General Settings', 'intellisend'); ?> <span style="font-size: 12px; color: #666; font-weight: normal;">(Auto-saved)</span></h2>
-                
+
                 <div class="intellisend-settings-row">
                     <div class="intellisend-settings-field">
                         <label for="default-provider"><?php echo esc_html__('Default SMTP Provider', 'intellisend'); ?></label>
@@ -54,7 +57,7 @@ function intellisend_render_settings_page_content() {
                         </select>
                         <span class="field-description"><?php echo esc_html__('Changes are saved automatically when you select a different provider.', 'intellisend'); ?></span>
                     </div>
-                    
+
                     <div class="intellisend-settings-field">
                         <label for="test-recipient"><?php echo esc_html__('Test Recipient Email', 'intellisend'); ?></label>
                         <div class="input-with-button">
@@ -64,7 +67,7 @@ function intellisend_render_settings_page_content() {
                         <span class="field-description"><?php echo esc_html__('Changes are saved automatically 1 second after you stop typing.', 'intellisend'); ?></span>
                     </div>
                 </div>
-                
+
                 <div class="intellisend-settings-row">
                     <div class="intellisend-settings-field">
                         <label for="logs-retention-days"><?php echo esc_html__('Logs Retention Period', 'intellisend'); ?></label>
@@ -73,21 +76,35 @@ function intellisend_render_settings_page_content() {
                         <span class="field-description"><?php echo esc_html__('Changes are saved automatically when you select a different period.', 'intellisend'); ?></span>
                     </div>
                 </div>
+
+                <div class="intellisend-settings-row">
+                    <div class="intellisend-settings-field">
+                        <label for="debug-enabled"><?php echo esc_html__('Debug Mode', 'intellisend'); ?></label>
+                        <div class="toggle-switch-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="debug_enabled" id="debug-enabled" value="1" <?php checked($settings->debug_enabled ?? 0); ?>>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="toggle-label"><?php echo ($settings->debug_enabled ?? 0) ? esc_html__('Enabled', 'intellisend') : esc_html__('Disabled', 'intellisend'); ?></span>
+                        </div>
+                        <span class="field-description"><?php echo esc_html__('Enable detailed debug logging. Only enable when troubleshooting issues.', 'intellisend'); ?></span>
+                    </div>
+                </div>
             </div>
         </div>
-        
+
         <!-- Anti-Spam Settings Form (Manual Save) -->
         <form id="intellisend-settings-form" method="post" action="">
             <div class="intellisend-settings-container">
                 <div class="intellisend-settings-section">
                     <h2 class="intellisend-settings-section-title"><?php echo esc_html__('Anti-Spam Settings', 'intellisend'); ?></h2>
-                    
+
                     <div class="intellisend-settings-row">
                         <div class="intellisend-settings-field">
                             <label for="anti-spam-endpoint"><?php echo esc_html__('Endpoint', 'intellisend'); ?></label>
                             <input type="url" name="antiSpamEndPoint" id="anti-spam-endpoint" value="<?php echo esc_attr($settings->antiSpamEndPoint ?? ''); ?>" placeholder="https://api.example.com/spam-check">
                         </div>
-                        
+
                         <div class="intellisend-settings-field">
                             <label for="api-key"><?php echo esc_html__('API Key', 'intellisend'); ?></label>
                             <div class="input-with-button">
@@ -102,7 +119,7 @@ function intellisend_render_settings_page_content() {
                             <?php endif; ?>
                         </div>
                     </div>
-                    
+
                     <div class="intellisend-settings-row">
                         <div class="intellisend-settings-field full-width">
                             <label for="spam-test-message"><?php echo esc_html__('Test Spam Message', 'intellisend'); ?></label>
@@ -114,7 +131,7 @@ function intellisend_render_settings_page_content() {
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Submit Section -->
                 <div class="intellisend-settings-submit">
                     <button type="submit" class="button button-primary"><?php echo esc_html__('Save Anti-Spam Settings', 'intellisend'); ?></button>
@@ -122,5 +139,5 @@ function intellisend_render_settings_page_content() {
             </div>
         </form>
     </div>
-    <?php
+<?php
 }

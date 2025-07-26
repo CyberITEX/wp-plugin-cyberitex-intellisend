@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * includes\class-form.php
  * IntelliSend Form Class
  * Handles email interception and routing for Contact Form 7 and other forms
  *
@@ -17,11 +18,6 @@ if (!defined('WPINC')) {
  */
 class IntelliSend_Form
 {
-    /**
-     * Debug mode flag
-     */
-    private static $debug_enabled = true; // Set to false to disable debug logging
-
     /**
      * Current email being processed
      */
@@ -42,6 +38,46 @@ class IntelliSend_Form
      */
     public static function init()
     {
+        // Don't hook into email system during activation
+        if ( defined( 'INTELLISEND_ACTIVATING' ) ) {
+            return;
+        }
+        
+        // Check if tables exist before initializing email hooks
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'intellisend_settings';
+        $table_exists = $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
+        
+        if ( !$table_exists ) {
+            // Tables don't exist yet, defer initialization
+            add_action( 'init', array( __CLASS__, 'delayed_init' ), 20 );
+            return;
+        }
+        
+        // Tables exist, safe to initialize
+        self::setup_email_hooks();
+    }
+
+    /**
+     * Delayed initialization for when tables don't exist initially
+     */
+    public static function delayed_init()
+    {
+        // Check again if tables exist
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'intellisend_settings';
+        $table_exists = $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
+        
+        if ( $table_exists && ! defined( 'INTELLISEND_ACTIVATING' ) ) {
+            self::setup_email_hooks();
+        }
+    }
+
+    /**
+     * Set up email hooks
+     */
+    private static function setup_email_hooks()
+    {
         // Hook into WordPress mail system
         add_filter('wp_mail', array(__CLASS__, 'intercept_email'), 10, 1);
         add_action('phpmailer_init', array(__CLASS__, 'configure_phpmailer'), 10, 1);
@@ -49,6 +85,46 @@ class IntelliSend_Form
         add_action('wp_mail_failed', array(__CLASS__, 'log_email_failure'), 10, 1);
 
         self::debug_log('IntelliSend_Form: Initialized email hooks');
+    }
+
+    /**
+     * Check if debug mode is enabled from database settings (safe version)
+     */
+    private static function is_debug_enabled()
+    {
+        // Don't try to access database during activation
+        if ( defined( 'INTELLISEND_ACTIVATING' ) ) {
+            return false;
+        }
+        
+        // Check if tables exist before trying to query
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'intellisend_settings';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
+        
+        if ( !$table_exists ) {
+            return false;
+        }
+        
+        try {
+            $settings = IntelliSend_Database::get_settings();
+            return $settings && isset($settings->debug_enabled) ? (bool) $settings->debug_enabled : false;
+        } catch ( Exception $e ) {
+            // Fallback to false if any error occurs
+            return false;
+        }
+    }
+
+    /**
+     * Debug logging with database-driven enable/disable
+     */
+    private static function debug_log($message)
+    {
+        if (self::is_debug_enabled()) {
+            error_log('IntelliSend Debug: ' . $message);
+        }
     }
 
     // ===========================================
@@ -99,7 +175,6 @@ class IntelliSend_Form
 
             self::debug_log('=== INTELLISEND EMAIL INTERCEPTION END ===');
             return $args;
-
         } catch (Exception $e) {
             error_log('IntelliSend Error in intercept_email: ' . $e->getMessage());
             error_log('Stack trace: ' . $e->getTraceAsString());
@@ -146,7 +221,6 @@ class IntelliSend_Form
 
             self::debug_log('IntelliSend: PHPMailer configured successfully');
             self::debug_log('=== INTELLISEND PHPMAILER CONFIGURATION END ===');
-
         } catch (Exception $e) {
             error_log('IntelliSend Error in configure_phpmailer: ' . $e->getMessage());
             error_log('Stack trace: ' . $e->getTraceAsString());
@@ -427,7 +501,7 @@ class IntelliSend_Form
      */
     private static function configure_smtp_debugging($phpmailer)
     {
-        if (self::$debug_enabled && defined('WP_DEBUG') && WP_DEBUG) {
+        if (self::is_debug_enabled()) {
             $phpmailer->SMTPDebug = 2;
             $phpmailer->Debugoutput = function ($str, $level) {
                 error_log("SMTP Debug: $str");
@@ -455,11 +529,11 @@ class IntelliSend_Form
             // Mark both current_email and args as spam for proper logging
             self::$current_email['isSpam'] = true;
             self::$current_email['spamScore'] = $spam_result['score'] ?? 0;
-            
+
             // Also update the original args to ensure spam data flows through
             $args['isSpam'] = true;
             $args['spamScore'] = $spam_result['score'] ?? 0;
-            
+
             self::debug_log('IntelliSend: Spam data set - isSpam: true, score: ' . ($spam_result['score'] ?? 0));
         }
     }
@@ -486,7 +560,6 @@ class IntelliSend_Form
             $message_content = $email_args['message'] ?? '';
 
             return $spam_checker->check($message_content, $settings->antiSpamApiKey);
-
         } catch (Exception $e) {
             error_log('IntelliSend Error in spam check: ' . $e->getMessage());
             return false;
@@ -504,8 +577,8 @@ class IntelliSend_Form
     {
         // Check if this was a spam email by looking at current_email state
         $is_spam = (self::$current_email && isset(self::$current_email['isSpam']) && self::$current_email['isSpam']) ||
-                   (isset($args['isSpam']) && $args['isSpam']);
-        
+            (isset($args['isSpam']) && $args['isSpam']);
+
         $status = $is_spam ? 'blocked' : 'sent';
 
         self::debug_log($is_spam ? 'IntelliSend: Spam email blocked and redirected' : 'IntelliSend: Email sent successfully');
@@ -602,10 +675,10 @@ class IntelliSend_Form
             if ($is_spam) {
                 // For spam: record blackhole as the actual recipient
                 $actual_recipients = 'blackhole@cyberitex.com';
-                $log_details = 'SPAM EMAIL REDIRECTED' . "\n" . 
-                              'Original Recipients: ' . $original_recipients . "\n" . 
-                              'Redirected To: blackhole@cyberitex.com' . "\n" . 
-                              self::generate_log_entry();
+                $log_details = 'SPAM EMAIL REDIRECTED' . "\n" .
+                    'Original Recipients: ' . $original_recipients . "\n" .
+                    'Redirected To: blackhole@cyberitex.com' . "\n" .
+                    self::generate_log_entry();
                 self::debug_log('IntelliSend: Logging as SPAM - recipients set to blackhole@cyberitex.com');
             } else {
                 // For normal emails: record original recipients
@@ -644,7 +717,6 @@ class IntelliSend_Form
             } else {
                 self::debug_log('IntelliSend: Failed to log email to database');
             }
-
         } catch (Exception $e) {
             error_log('IntelliSend Error logging email: ' . $e->getMessage());
         }
@@ -679,16 +751,6 @@ class IntelliSend_Form
     // ===========================================
 
     /**
-     * Debug logging with enable/disable switch
-     */
-    private static function debug_log($message)
-    {
-        if (self::$debug_enabled) {
-            error_log($message);
-        }
-    }
-
-    /**
      * Reset state after email processing
      */
     public static function reset_state()
@@ -699,19 +761,21 @@ class IntelliSend_Form
     }
 
     /**
-     * Enable or disable debug logging
+     * Enable or disable debug logging (legacy method for compatibility)
      */
     public static function set_debug_mode($enabled)
     {
-        self::$debug_enabled = (bool) $enabled;
+        // This method is kept for backward compatibility but doesn't do anything
+        // Debug mode is now controlled via database settings
+        self::debug_log('Warning: set_debug_mode() is deprecated. Use database settings instead.');
     }
 
     /**
      * Get current debug mode status
      */
-    public static function is_debug_enabled()
+    public static function get_debug_status()
     {
-        return self::$debug_enabled;
+        return self::is_debug_enabled();
     }
 }
 
