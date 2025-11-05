@@ -424,6 +424,15 @@ class IntelliSend_Ajax
         // Capture debug output
         $debug_output = '';
 
+        // Set a flag to bypass the mail interception for test emails BEFORE adding hooks
+        $GLOBALS['intellisend_test_email'] = true;
+
+        // Temporarily remove ALL IntelliSend hooks to prevent interference
+        remove_filter('wp_mail', array('IntelliSend_Form', 'intercept_email'), 10);
+        remove_action('phpmailer_init', array('IntelliSend_Form', 'configure_phpmailer'), 10);
+        remove_action('wp_mail_succeeded', array('IntelliSend_Form', 'log_email_success'), 10);
+        remove_action('wp_mail_failed', array('IntelliSend_Form', 'log_email_failure'), 10);
+
         // Configure PHPMailer to use SMTP
         add_action('phpmailer_init', function ($phpmailer) use ($provider, &$debug_output) {
             $phpmailer->isSMTP();
@@ -454,11 +463,14 @@ class IntelliSend_Ajax
             }
         });
 
-        // Set a flag to bypass the mail interception for test emails
-        $GLOBALS['intellisend_test_email'] = true;
-
         // Send the test email
         $result = wp_mail($to, $subject, $message, $headers);
+
+        // Restore ALL IntelliSend hooks
+        add_filter('wp_mail', array('IntelliSend_Form', 'intercept_email'), 10);
+        add_action('phpmailer_init', array('IntelliSend_Form', 'configure_phpmailer'), 10);
+        add_action('wp_mail_succeeded', array('IntelliSend_Form', 'log_email_success'), 10);
+        add_action('wp_mail_failed', array('IntelliSend_Form', 'log_email_failure'), 10);
 
         // Extract and log only the error part if there is an error
         if (!$result && !empty($debug_output)) {

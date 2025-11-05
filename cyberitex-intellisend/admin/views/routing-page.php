@@ -358,7 +358,7 @@ add_action('admin_enqueue_scripts', function($hook) {
             'intellisendData',
             array(
                 'nonce' => wp_create_nonce('intellisend_routing_nonce'),
-                'ajax_url' => admin_url('admin-ajax.php'),  // Fixed: was ajaxUrl, should be ajax_url
+                'ajax_url' => admin_url('admin-ajax.php'),
                 'strings' => array(
                     'saveSuccess' => __('Routing rule saved successfully.', 'intellisend'),
                     'saveFailed' => __('Failed to save routing rule.', 'intellisend'),

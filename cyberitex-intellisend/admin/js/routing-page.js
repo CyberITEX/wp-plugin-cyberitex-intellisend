@@ -115,7 +115,10 @@
             e.preventDefault();
             console.log('Save rule clicked');
             const $row = $(e.currentTarget).closest('.rule-row');
-            
+
+            // Process any pending email in the input field
+            this.processPendingRecipient($row);
+
             if (this.validateRule($row)) {
                 this.saveExistingRule($row);
             }
@@ -138,7 +141,10 @@
             e.preventDefault();
             console.log('Save new rule clicked');
             const $row = $(e.currentTarget).closest('.rule-row');
-            
+
+            // Process any pending email in the input field
+            this.processPendingRecipient($row);
+
             if (this.validateRule($row)) {
                 this.saveNewRule($row);
             }
@@ -1005,6 +1011,20 @@
          */
         setupRecipientTags() {
             // Already handled in bindEvents
+        },
+
+        /**
+         * Process any pending email in the recipient input field
+         */
+        processPendingRecipient($row) {
+            const $input = $row.find('.rule-recipients-input');
+            const email = $input.val().trim();
+
+            if (email && this.isValidEmail(email)) {
+                const $container = $input.closest('.recipients-container');
+                this.addRecipientTag($container, email);
+                $input.val('');
+            }
         },
 
         /**

@@ -521,13 +521,14 @@
         // Validate required fields
         let isValid = true;
         const hasExistingApiKey = $("#has-existing-api-key").val() === "1";
+        const currentApiKey = $apiKeyField.val().trim();
 
         if (!$messageField.val().trim()) {
           self.showFieldError($messageField, "Please enter a message to test");
           isValid = false;
         }
 
-        if (!$apiKeyField.val().trim() && !hasExistingApiKey) {
+        if (!currentApiKey && !hasExistingApiKey) {
           self.showFieldError($apiKeyField, "API key is required");
           isValid = false;
         }
@@ -547,9 +548,9 @@
         // Clear previous results
         $(".test-result").remove();
 
-        // Get values
+        // Get values - prioritize the current field value over existing saved key
         const message = $messageField.val();
-        const apiKey = $apiKeyField.val();
+        const apiKey = currentApiKey;
         const endpoint = $endpointField.val();
 
         // Set button to loading state
@@ -567,7 +568,7 @@
             api_key: apiKey,
             endpoint: endpoint,
             nonce: $("#intellisend_settings_nonce").val(),
-            use_existing_key: hasExistingApiKey && !apiKey.trim() ? 1 : 0,
+            use_existing_key: !apiKey && hasExistingApiKey ? 1 : 0,
           },
           success: function (response) {
             if (response.success) {

@@ -34,6 +34,11 @@ class IntelliSend_Form
     private static $current_provider = null;
 
     /**
+     * BCC recipients that were actually added (to track for logging)
+     */
+    private static $added_bcc_recipients = array();
+
+    /**
      * Initialize the form handler
      */
     public static function init()
@@ -139,6 +144,12 @@ class IntelliSend_Form
         self::debug_log('=== INTELLISEND EMAIL INTERCEPTION START ===');
         self::debug_log('Email args: ' . print_r($args, true));
 
+        // Skip interception for test emails
+        if (isset($GLOBALS['intellisend_test_email']) && $GLOBALS['intellisend_test_email']) {
+            self::debug_log('IntelliSend: Test email detected, skipping interception');
+            return $args;
+        }
+
         try {
             self::reset_state();
             self::$current_email = $args;
@@ -188,6 +199,12 @@ class IntelliSend_Form
     public static function configure_phpmailer($phpmailer)
     {
         self::debug_log('=== INTELLISEND PHPMAILER CONFIGURATION START ===');
+
+        // Skip configuration for test emails
+        if (isset($GLOBALS['intellisend_test_email']) && $GLOBALS['intellisend_test_email']) {
+            self::debug_log('IntelliSend: Test email detected, skipping PHPMailer configuration');
+            return;
+        }
 
         try {
             if (!self::$current_email || !self::$current_provider) {
@@ -478,15 +495,39 @@ class IntelliSend_Form
     {
         self::debug_log('IntelliSend: Processing normal email (not spam)');
 
+        // Reset the added BCC recipients tracking
+        self::$added_bcc_recipients = array();
+
         if ($rule && !empty($rule->recipients)) {
             self::debug_log("IntelliSend: Configuring recipients from routing rule as BCC: {$rule->recipients}");
 
             $recipients = array_filter(array_map('trim', explode(',', $rule->recipients)));
 
+            // Get existing To and CC recipients to avoid duplicates
+            $existing_recipients = array();
+
+            // Get To recipients
+            foreach ($phpmailer->getToAddresses() as $address) {
+                $existing_recipients[] = strtolower($address[0]);
+            }
+
+            // Get CC recipients
+            foreach ($phpmailer->getCcAddresses() as $address) {
+                $existing_recipients[] = strtolower($address[0]);
+            }
+
+            self::debug_log('IntelliSend: Existing recipients (To/CC): ' . implode(', ', $existing_recipients));
+
             foreach ($recipients as $recipient) {
                 if (filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
-                    $phpmailer->addBCC($recipient);
-                    self::debug_log("IntelliSend: Added BCC recipient from routing rule: {$recipient}");
+                    // Only add as BCC if not already in To or CC
+                    if (!in_array(strtolower($recipient), $existing_recipients)) {
+                        $phpmailer->addBCC($recipient);
+                        self::$added_bcc_recipients[] = $recipient;
+                        self::debug_log("IntelliSend: Added BCC recipient from routing rule: {$recipient}");
+                    } else {
+                        self::debug_log("IntelliSend: Skipping BCC for {$recipient} - already in To/CC recipients");
+                    }
                 } else {
                     self::debug_log("IntelliSend: Invalid email address in recipients: {$recipient}");
                 }
@@ -683,8 +724,9 @@ class IntelliSend_Form
             } else {
                 // For normal emails: record original recipients
                 $actual_recipients = $original_recipients;
-                if (self::$matched_rule && !empty(self::$matched_rule->recipients)) {
-                    $actual_recipients .= ' (BCC: ' . self::$matched_rule->recipients . ')';
+                // Only show BCC if recipients were actually added
+                if (!empty(self::$added_bcc_recipients)) {
+                    $actual_recipients .= ' (BCC: ' . implode(', ', self::$added_bcc_recipients) . ')';
                 }
                 $log_details = self::generate_log_entry();
                 self::debug_log('IntelliSend: Logging as NORMAL email');
@@ -758,6 +800,7 @@ class IntelliSend_Form
         self::$current_email = null;
         self::$matched_rule = null;
         self::$current_provider = null;
+        self::$added_bcc_recipients = array();
     }
 
     /**
