@@ -18,12 +18,18 @@
         init() {
             this.bindEvents();
             this.setupRecipientTags();
-            console.log('IntelliSend Routing Manager initialized');
+            this.labelFields($(document));
+
         },
 
         /**
          * Bind all event handlers
          */
+        labelFields($container) {
+            const labels = {'rule-name': 'Rule name', 'rule-patterns': 'Subject patterns', 'rule-pattern-type': 'Pattern type', 'rule-provider': 'Provider', 'rule-recipients-input': 'Add recipient email', 'rule-priority': 'Priority', 'rule-enabled': 'Rule status', 'rule-antispam': 'Spam protection'};
+            Object.keys(labels).forEach(function(name) { $container.find("." + name).attr("aria-label", labels[name]); });
+        },
+
         bindEvents() {
             // Add new rule button - using the actual ID from your HTML
             $(document).on('click', '#add-rule-btn', this.handleAddNewRule.bind(this));
@@ -94,7 +100,7 @@
          */
         handleAddNewRule(e) {
             e.preventDefault();
-            console.log('Add new rule clicked');
+
             this.addNewRuleRow();
         },
 
@@ -103,7 +109,7 @@
          */
         handleEditRule(e) {
             e.preventDefault();
-            console.log('Edit rule clicked');
+
             const $row = $(e.currentTarget).closest('.rule-row');
             this.enterEditMode($row);
         },
@@ -113,7 +119,7 @@
          */
         handleSaveRule(e) {
             e.preventDefault();
-            console.log('Save rule clicked');
+
             const $row = $(e.currentTarget).closest('.rule-row');
 
             // Process any pending email in the input field
@@ -129,7 +135,7 @@
          */
         handleCancelEdit(e) {
             e.preventDefault();
-            console.log('Cancel edit clicked');
+
             const $row = $(e.currentTarget).closest('.rule-row');
             this.exitEditMode($row, true);
         },
@@ -139,7 +145,7 @@
          */
         handleSaveNewRule(e) {
             e.preventDefault();
-            console.log('Save new rule clicked');
+
             const $row = $(e.currentTarget).closest('.rule-row');
 
             // Process any pending email in the input field
@@ -155,7 +161,7 @@
          */
         handleCancelNewRule(e) {
             e.preventDefault();
-            console.log('Cancel new rule clicked');
+
             const $row = $(e.currentTarget).closest('.rule-row');
             $row.remove();
         },
@@ -165,7 +171,7 @@
          */
         handleDeleteRule(e) {
             e.preventDefault();
-            console.log('Delete rule clicked');
+
             const $button = $(e.currentTarget);
             const ruleId = $button.data('id');
             const ruleName = $button.data('name');
@@ -178,7 +184,7 @@
          */
         handleActivateRule(e) {
             e.preventDefault();
-            console.log('Activate rule clicked');
+
             const ruleId = $(e.currentTarget).data('id');
             this.toggleRuleStatus(ruleId, true);
         },
@@ -188,7 +194,7 @@
          */
         handleDeactivateRule(e) {
             e.preventDefault();
-            console.log('Deactivate rule clicked');
+
             const ruleId = $(e.currentTarget).data('id');
             this.toggleRuleStatus(ruleId, false);
         },
@@ -198,7 +204,7 @@
          */
         handleDuplicateRule(e) {
             e.preventDefault();
-            console.log('Duplicate rule clicked');
+
             const $row = $(e.currentTarget).closest('.rule-row');
             this.duplicateRule($row);
         },
@@ -251,8 +257,7 @@
          * Add a new rule row to the table
          */
         addNewRuleRow() {
-            console.log('Adding new rule row');
-            
+
             // Check if there's already a new rule being added
             if ($('#routing-rules-table .new-rule-row').length > 0) {
                 this.showError('Please finish adding the current rule before adding another.');
@@ -262,7 +267,7 @@
             // Get the template and clone it
             const template = document.getElementById('new-rule-template');
             if (!template) {
-                console.error('New rule template not found');
+
                 this.showError('Unable to add new rule. Template not found.');
                 return;
             }
@@ -271,22 +276,21 @@
             
             // Add to table
             $('#routing-rules-table tbody').append($newRow);
+            this.labelFields($newRow);
             
             // Get the actual row that was added
             const $addedRow = $('#routing-rules-table .new-rule-row').last();
             
             // Show edit mode immediately
             this.enterEditMode($addedRow);
-            
-            console.log('New rule row added and in edit mode');
+
         },
 
         /**
          * Enter edit mode for a rule row
          */
         enterEditMode($row) {
-            console.log('Entering edit mode for row:', $row);
-            
+
             // Check if another row is already in edit mode
             const $editingRow = $('#routing-rules-table .rule-row').filter(function() {
                 return $(this).find('.edit-mode').is(':visible');
@@ -323,16 +327,14 @@
                     $row.find('.rule-provider').focus();
                 }
             }, 100);
-            
-            console.log('Edit mode activated');
+
         },
 
         /**
          * Exit edit mode for a rule row
          */
         exitEditMode($row, cancelled = false) {
-            console.log('Exiting edit mode, cancelled:', cancelled);
-            
+
             if (cancelled) {
                 if ($row.hasClass('new-rule-row')) {
                     // Remove new rule row if cancelled
@@ -469,7 +471,12 @@
             let isValid = true;
             this.clearAllValidationErrors($row);
 
-            console.log('Validating rule...');
+            // A pending invalid recipient must not silently disappear when saving the row.
+            const $pendingRecipient = $row.find('.rule-recipients-input');
+            if (($pendingRecipient.val() || '').trim()) {
+                this.showFieldError($pendingRecipient, 'Enter a valid recipient email address or clear this field.');
+                isValid = false;
+            }
 
             // Validate rule name (always required)
             if (!this.validateField($row.find('.rule-name'), 'Rule name is required')) {
@@ -506,10 +513,9 @@
                 }
             } else {
                 // Default rule validation - patterns and priority handled by backend
-                console.log('Validating default rule - patterns and priority handled by backend');
+
             }
 
-            console.log('Validation result:', isValid);
             return isValid;
         },
 
@@ -599,14 +605,14 @@
             $field.siblings('.field-error').remove();
             
             // Add new error message
-            $field.after(`<span class="field-error">${message}</span>`);
+            $field.attr("aria-invalid", "true").after($('<span class="field-error" role="alert"></span>').text(message));
         },
 
         /**
          * Clear field error
          */
         clearFieldError($field) {
-            $field.removeClass('has-error');
+            $field.removeClass('has-error').removeAttr('aria-invalid');
             $field.siblings('.field-error').remove();
         },
 
@@ -614,7 +620,7 @@
          * Clear all validation errors in a row
          */
         clearAllValidationErrors($row) {
-            $row.find('.has-error').removeClass('has-error');
+            $row.find('.has-error').removeClass('has-error').removeAttr('aria-invalid');
             $row.find('.field-error').remove();
         },
 
@@ -629,37 +635,21 @@
          * Save an existing rule
          */
         saveExistingRule($row) {
-            console.log('=== SAVING EXISTING RULE ===');
+
             const ruleId = $row.data('id');
-            console.log('Rule ID:', ruleId);
-            
+
             // Debug: Log all form field values before serialization
-            console.log('Form field values before serialization:');
-            console.log('  rule-name:', $row.find('.rule-name').val());
-            console.log('  rule-patterns:', $row.find('.rule-patterns').val());
-            console.log('  rule-pattern-type:', $row.find('.rule-pattern-type').val());
-            console.log('  rule-provider:', $row.find('.rule-provider').val());
-            console.log('  rule-recipients:', $row.find('.rule-recipients').val());
-            console.log('  rule-priority:', $row.find('.rule-priority').val());
-            console.log('  rule-enabled:', $row.find('.rule-enabled').val());
-            console.log('  rule-antispam:', $row.find('.rule-antispam').val());
-            
+
             // Use the serialized format for existing rules too
             const formDataString = this.createSerializedFormData($row, ruleId);
-            console.log('Serialized form data:', formDataString);
-            
+
             // Debug: Log AJAX request details
             const ajaxData = {
                 action: 'intellisend_update_routing_rule',
                 nonce: intellisendData.nonce,
                 formData: formDataString
             };
-            
-            console.log('AJAX Request Details:');
-            console.log('  URL:', intellisendData.ajax_url);  // Fixed: was ajaxUrl, should be ajax_url
-            console.log('  Data:', ajaxData);
-            console.log('  Available intellisendData:', intellisendData);
-            
+
             this.showLoading();
             
             $.ajax({
@@ -667,42 +657,29 @@
                 type: 'POST',
                 data: ajaxData,
                 success: (response) => {
-                    console.log('=== UPDATE SUCCESS RESPONSE ===');
-                    console.log('Full response:', response);
-                    console.log('Response type:', typeof response);
-                    console.log('Response success:', response.success);
-                    console.log('Response data:', response.data);
-                    
+
                     if (response.success) {
                         this.exitEditMode($row, false);
                         this.showSuccess('Routing rule updated successfully');
                     } else {
-                        console.error('=== UPDATE RULE FAILED ===');
-                        console.error('Error message:', response.data);
-                        console.error('Full error response:', response);
+
                         this.showError(response.data || 'Failed to update routing rule');
                     }
                 },
                 error: (xhr, status, error) => {
-                    console.error('=== AJAX ERROR ===');
-                    console.error('XHR object:', xhr);
-                    console.error('Status:', status);
-                    console.error('Error:', error);
-                    console.error('Response Text:', xhr.responseText);
-                    console.error('Status Code:', xhr.status);
-                    
+
                     // Try to parse the response as JSON
                     try {
                         const errorResponse = JSON.parse(xhr.responseText);
-                        console.error('Parsed error response:', errorResponse);
+
                     } catch (e) {
-                        console.error('Could not parse error response as JSON');
+
                     }
                     
                     this.showError(`Network error: ${error || 'Unknown error'}`);
                 },
                 complete: () => {
-                    console.log('=== UPDATE AJAX COMPLETE ===');
+
                     this.hideLoading();
                 }
             });
@@ -712,20 +689,9 @@
          * Save a new rule
          */
         saveNewRule($row) {
-            console.log('=== SAVING NEW RULE ===');
-            console.log('Row data:', $row.data());
-            
+
             // Debug: Log all form field values
-            console.log('Form field values:');
-            console.log('  rule-name:', $row.find('.rule-name').val());
-            console.log('  rule-patterns:', $row.find('.rule-patterns').val());
-            console.log('  rule-pattern-type:', $row.find('.rule-pattern-type').val());
-            console.log('  rule-provider:', $row.find('.rule-provider').val());
-            console.log('  rule-recipients:', $row.find('.rule-recipients').val());
-            console.log('  rule-priority:', $row.find('.rule-priority').val());
-            console.log('  rule-enabled:', $row.find('.rule-enabled').val());
-            console.log('  rule-antispam:', $row.find('.rule-antispam').val());
-            
+
             // Create serialized form data that matches the backend expectations
             const formDataString = this.createSerializedFormData($row);
             
@@ -735,11 +701,7 @@
                 nonce: intellisendData.nonce,
                 formData: formDataString
             };
-            
-            console.log('AJAX Request Data:', ajaxData);
-            console.log('AJAX URL:', intellisendData.ajax_url);  // Fixed: was ajaxUrl, should be ajax_url
-            console.log('Available intellisendData:', intellisendData);
-            
+
             this.showLoading();
             
             $.ajax({
@@ -747,42 +709,29 @@
                 type: 'POST',
                 data: ajaxData,
                 success: (response) => {
-                    console.log('=== AJAX SUCCESS RESPONSE ===');
-                    console.log('Full response:', response);
-                    console.log('Response type:', typeof response);
-                    console.log('Response success:', response.success);
-                    console.log('Response data:', response.data);
-                    
+
                     if (response.success) {
                         this.showSuccess('Routing rule added successfully');
                         setTimeout(() => location.reload(), 1500);
                     } else {
-                        console.error('=== ADD RULE FAILED ===');
-                        console.error('Error message:', response.data);
-                        console.error('Full error response:', response);
+
                         this.showError(response.data || 'Failed to add routing rule');
                     }
                 },
                 error: (xhr, status, error) => {
-                    console.error('=== AJAX ERROR ===');
-                    console.error('XHR object:', xhr);
-                    console.error('Status:', status);
-                    console.error('Error:', error);
-                    console.error('Response Text:', xhr.responseText);
-                    console.error('Status Code:', xhr.status);
-                    
+
                     // Try to parse the response as JSON
                     try {
                         const errorResponse = JSON.parse(xhr.responseText);
-                        console.error('Parsed error response:', errorResponse);
+
                     } catch (e) {
-                        console.error('Could not parse error response as JSON');
+
                     }
                     
                     this.showError(`Network error: ${error || 'Unknown error'}`);
                 },
                 complete: () => {
-                    console.log('=== AJAX COMPLETE ===');
+
                     this.hideLoading();
                 }
             });
@@ -792,73 +741,11 @@
          * Create serialized form data that matches backend expectations
          */
         createSerializedFormData($row, ruleId = null) {
-            console.log('=== CREATING SERIALIZED FORM DATA ===');
-            
-            // Create a temporary form to serialize data properly
-            const $form = $('<form></form>');
-            
-            // Get values from form fields
-            const ruleName = $row.find('.rule-name').val().trim();
-            const ruleProvider = $row.find('.rule-provider').val();
-            const ruleRecipients = $row.find('.rule-recipients').val().trim();
-            const rulePatterns = $row.find('.rule-patterns').val().trim();
-            const rulePatternType = $row.find('.rule-pattern-type').val() || 'wildcard';
-            const rulePriority = $row.find('.rule-priority').val();
-            const ruleEnabled = $row.find('.rule-enabled').val();
-            const ruleAntispam = $row.find('.rule-antispam').val();
-            
-            console.log('Field values extracted:');
-            console.log('  ruleName:', ruleName);
-            console.log('  ruleProvider:', ruleProvider);
-            console.log('  ruleRecipients:', ruleRecipients);
-            console.log('  rulePatterns:', rulePatterns);
-            console.log('  rulePatternType:', rulePatternType);
-            console.log('  rulePriority:', rulePriority);
-            console.log('  ruleEnabled:', ruleEnabled);
-            console.log('  ruleAntispam:', ruleAntispam);
-            
-            // Add fields with the names expected by admin/class-ajax.php
-            $form.append(`<input type="hidden" name="name" value="${ruleName}">`);
-            $form.append(`<input type="hidden" name="default_provider_name" value="${ruleProvider}">`);
-            $form.append(`<input type="hidden" name="recipients" value="${ruleRecipients}">`);
-            $form.append(`<input type="hidden" name="pattern_type" value="${rulePatternType}">`);
-            
-            // Add rule ID for updates
-            if (ruleId) {
-                console.log('Adding id:', ruleId);
-                $form.append(`<input type="hidden" name="id" value="${ruleId}">`);
-            }
-            
-            // Add patterns and priority for non-default rules
-            if (!this.isDefaultRule($row)) {
-                console.log('Non-default rule - adding patterns and priority');
-                $form.append(`<input type="hidden" name="subject_patterns" value="${rulePatterns}">`);
-                $form.append(`<input type="hidden" name="priority" value="${rulePriority}">`);
-            } else {
-                console.log('Default rule - skipping patterns and priority');
-            }
-            
-            // Handle checkboxes - ALWAYS add both enabled and anti_spam_enabled
-            // This ensures the backend receives explicit values for both on/off states
-            console.log('Adding enabled=' + (ruleEnabled === '1' ? '1' : '0'));
-            $form.append(`<input type="hidden" name="enabled" value="${ruleEnabled === '1' ? '1' : '0'}">`);
-            
-            console.log('Adding anti_spam_enabled=' + (ruleAntispam === '1' ? '1' : '0'));
-            $form.append(`<input type="hidden" name="anti_spam_enabled" value="${ruleAntispam === '1' ? '1' : '0'}">`);
-            
-            
-            const serializedData = $form.serialize();
-            console.log('Final serialized data:', serializedData);
-            
-            // Also log the form HTML for debugging
-            console.log('Form HTML created:', $form.html());
-            
-            return serializedData;
+            const data = this.collectRuleData($row, ruleId);
+            // Encode values directly: quotes and ampersands must never become markup.
+            return $.param(data);
         },
 
-        /**
-         * Collect rule data from form inputs (legacy method for object format)
-         */
         collectRuleData($row, ruleId = null) {
             const formData = {
                 name: $row.find('.rule-name').val().trim(),
@@ -880,7 +767,6 @@
                 formData.priority = parseInt($row.find('.rule-priority').val());
             }
 
-            console.log('Collected form data:', formData);
             return formData;
         },
 
@@ -910,7 +796,7 @@
                     }
                 },
                 error: (xhr, status, error) => {
-                    console.error('AJAX Error:', xhr, status, error);
+
                     this.showError(`Network error: ${error || 'Unknown error'}`);
                 },
                 complete: () => {
@@ -953,7 +839,7 @@
                     }
                 },
                 error: (xhr, status, error) => {
-                    console.error('AJAX Error:', xhr, status, error);
+
                     this.showError(`Network error: ${error || 'Unknown error'}`);
                 },
                 complete: () => {
@@ -1049,7 +935,7 @@
             }
             
             // Add tag
-            const $tag = $('<span class="recipient-tag">' + email + '<span class="remove-recipient">×</span></span>');
+            const $tag = $('<span class="recipient-tag"></span>').text(email).append($('<button type="button" class="remove-recipient">×</button>').attr('aria-label', 'Remove ' + email));
             $container.find('.recipients-tags').append($tag);
             
             // Update hidden input
@@ -1122,14 +1008,15 @@
             // Create notification
             const $notification = $(`
                 <div class="notice notice-${type} is-dismissible intellisend-notification">
-                    <p>${message}</p>
+                    <p></p>
                     <button type="button" class="notice-dismiss">
                         <span class="screen-reader-text">Dismiss this notice.</span>
                     </button>
                 </div>
             `);
             
-            // Add to page
+            // Treat server messages as text, and announce the result.
+            $notification.attr('role', type === 'error' ? 'alert' : 'status').find('p').text(typeof message === 'string' ? message : (message && message.message) || 'The request could not be completed.');
             $('.wrap h1').after($notification);
             
             // Handle dismiss button
@@ -1150,9 +1037,7 @@
      * Initialize when document is ready
      */
     $(document).ready(function() {
-        console.log('Document ready, initializing RoutingManager...');
-        console.log('intellisendData available:', typeof intellisendData !== 'undefined');
-        
+
         // Initialize the routing manager
         RoutingManager.init();
     });

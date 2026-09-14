@@ -39,7 +39,7 @@
       // Create container and toggle button
       $apiKeyField.wrap('<div class="password-field-container"></div>');
       const $toggleButton = $(
-        '<button type="button" class="password-toggle" aria-label="Toggle password visibility">' +
+        '<button type="button" class="password-toggle" aria-label="Show API key" aria-pressed="false">' +
           eyeClosedSvg +
           "</button>"
       );
@@ -56,7 +56,7 @@
 
         // Toggle visibility
         $apiKeyField.attr("type", isVisible ? "password" : "text");
-        $(this).html(isVisible ? eyeClosedSvg : eyeOpenSvg);
+        $(this).html(isVisible ? eyeClosedSvg : eyeOpenSvg).attr({"aria-pressed": String(!isVisible), "aria-label": isVisible ? "Show API key" : "Hide API key"});
         $apiKeyField.focus();
       });
     },
@@ -113,6 +113,7 @@
 
       // Add select to DOM
       $originalInput.after($select);
+      $('label[for="logs-retention-days"]').attr("for", "logs-retention-select");
 
       // Listen for changes (auto-save will be handled in setupAutoSave)
       $select.on("change", function () {
@@ -479,7 +480,10 @@
             // Show success message
             IntelliSendToast.success("Anti-spam settings saved successfully.");
 
-            // Clear API key field for security
+            // Remember a successful first save without retaining the secret in the field.
+            if (formData.antiSpamApiKey.trim()) {
+              $("#has-existing-api-key").val("1");
+            }
             $("#api-key").val("");
           } else {
             // Show error message
@@ -729,14 +733,14 @@
       $field.siblings(".field-error").remove();
 
       // Add error message
-      $field.after('<span class="field-error">' + message + "</span>");
+      $field.attr("aria-invalid", "true").after($('<span class="field-error" role="alert"></span>').text(message));
     },
 
     /**
      * Clear all validation errors
      */
     clearValidationErrors: function () {
-      $(".has-error").removeClass("has-error");
+      $(".has-error").removeClass("has-error").removeAttr("aria-invalid");
       $(".field-error").remove();
     },
 
@@ -792,11 +796,13 @@
       );
 
       // Add toggle click handler
+      $(".intellisend-settings-section-title").wrapInner('<button type="button" class="section-toggle-button" aria-expanded="true"></button>');
       $(".intellisend-settings-section-title").on("click", function () {
         const $section = $(this).parent();
         const $content = $section.find(".intellisend-settings-row");
         const $indicator = $(this).find(".section-toggle-indicator");
 
+        $(this).find(".section-toggle-button").attr("aria-expanded", !$content.is(":visible"));
         if ($content.is(":visible")) {
           $content.slideUp(300);
           $indicator

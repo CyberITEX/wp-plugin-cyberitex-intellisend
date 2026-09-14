@@ -507,13 +507,16 @@ const IntelliSendToast = (function($) {
                 <div class="toast-icon">${icon}</div>
                 <div class="toast-content">
                     <div class="toast-title">${title}</div>
-                    ${message ? '<div class="toast-message">' + message + '</div>' : ''}
+                    <div class="toast-message"></div>
                 </div>
-                <div class="toast-close">&times;</div>
+                <button type="button" class="toast-close" aria-label="Dismiss notification">&times;</button>
             </div>
         `);
         
-        // Add close button functionality
+        $toast.attr('role', type === 'error' ? 'alert' : 'status');
+    $toast.find('.toast-message').text(message || '');
+
+    // Add close button functionality
         $toast.find('.toast-close').on('click', function() {
             $toast.removeClass('show');
             setTimeout(function() {

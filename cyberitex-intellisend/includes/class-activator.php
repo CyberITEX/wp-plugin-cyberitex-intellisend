@@ -31,6 +31,9 @@ class IntelliSend_Activator {
     public static function activate() {
         // Create database tables
         IntelliSend_Database::create_tables();
+
+        // Record the schema version so maybe_upgrade() stays a no-op until it changes
+        update_option( 'intellisend_db_version', IntelliSend_Database::DB_VERSION );
         
         // Set default settings if not already set
         if ( ! IntelliSend_Database::get_settings() ) {

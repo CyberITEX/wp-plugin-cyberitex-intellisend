@@ -72,7 +72,7 @@ function intellisend_render_routing_page_content()
                                     $provider_display_name = $rule->default_provider_name;
                                     foreach ($providers as $provider) {
                                         if ($provider->name === $rule->default_provider_name) {
-                                            $provider_display_name = ucfirst($provider->name);
+                                            $provider_display_name = IntelliSend_Database::get_provider_label($provider);
                                             break;
                                         }
                                     }
@@ -143,7 +143,7 @@ function intellisend_render_routing_page_content()
                                             <select class="edit-mode rule-provider" style="display:none;">
                                                 <?php foreach ($providers as $provider) : ?>
                                                     <option value="<?php echo esc_attr($provider->name); ?>" <?php selected($rule->default_provider_name, $provider->name); ?>>
-                                                        <?php echo esc_html(ucfirst($provider->name)); ?>
+                                                        <?php echo esc_html(IntelliSend_Database::get_provider_label($provider)); ?>
                                                     </option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -159,7 +159,7 @@ function intellisend_render_routing_page_content()
                                                         foreach ($recipients as $recipient) {
                                                             $recipient = trim($recipient);
                                                             if (!empty($recipient)) {
-                                                                echo '<span class="recipient-tag">' . esc_html($recipient) . '<span class="remove-recipient">×</span></span>';
+                                                                echo '<span class="recipient-tag">' . esc_html($recipient) . '<button type="button" class="remove-recipient" aria-label="Remove recipient">×</button></span>';
                                                             }
                                                         }
                                                     }
@@ -270,7 +270,7 @@ function intellisend_render_routing_page_content()
             </td>
             <td class="editable" data-field="patterns">
                 <span class="view-mode"></span>
-                <textarea class="edit-mode rule-patterns" placeholder="<?php echo esc_attr__('e.g. *@example.com, newsletter*', 'intellisend'); ?>"></textarea>
+                <textarea class="edit-mode rule-patterns" placeholder="<?php echo esc_attr__('e.g. newsletter*, order*', 'intellisend'); ?>"></textarea>
             </td>
             <td class="editable" data-field="pattern_type">
                 <span class="view-mode"></span>
@@ -288,7 +288,7 @@ function intellisend_render_routing_page_content()
                     <option value=""><?php echo esc_html__('Select Provider', 'intellisend'); ?></option>
                     <?php foreach ($providers as $provider) : ?>
                         <option value="<?php echo esc_attr($provider->name); ?>">
-                            <?php echo esc_html(ucfirst($provider->name)); ?>
+                            <?php echo esc_html(IntelliSend_Database::get_provider_label($provider)); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -298,7 +298,7 @@ function intellisend_render_routing_page_content()
                 <div class="edit-mode recipients-container">
                     <input type="text" class="rule-recipients-input" placeholder="<?php echo esc_attr__('Add email, press Enter', 'intellisend'); ?>">
                     <div class="recipients-tags">
-                        <span class="recipient-tag"><?php echo esc_html($default_recipient); ?><span class="remove-recipient">×</span></span>
+                        <span class="recipient-tag"><?php echo esc_html($default_recipient); ?><button type="button" class="remove-recipient" aria-label="Remove recipient">×</button></span>
                     </div>
                     <input type="hidden" class="rule-recipients" value="<?php echo esc_attr($default_recipient); ?>">
                 </div>

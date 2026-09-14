@@ -25,7 +25,7 @@ function intellisend_render_settings_page_content()
 
     // Enqueue the IntelliSendToast script
     wp_enqueue_script(
-        'intellisend-toast',
+        'intellisend-toast-script',
         INTELLISEND_PLUGIN_URL . 'admin/js/intellisend-toast.js',
         array('jquery'),
         INTELLISEND_VERSION,
@@ -45,17 +45,20 @@ function intellisend_render_settings_page_content()
 
                 <div class="intellisend-settings-row">
                     <div class="intellisend-settings-field">
-                        <label for="default-provider"><?php echo esc_html__('Default SMTP Provider', 'intellisend'); ?></label>
+                        <label for="default-provider"><?php echo esc_html__('Default Email Provider', 'intellisend'); ?></label>
                         <select name="defaultProviderName" id="default-provider">
                             <?php if (empty($providers)) : ?>
                                 <option value=""><?php echo esc_html__('No providers available', 'intellisend'); ?></option>
                             <?php else : ?>
                                 <?php foreach ($providers as $provider) : ?>
-                                    <option value="<?php echo esc_attr($provider->name); ?>" <?php selected($settings->defaultProviderName, $provider->name); ?>><?php echo esc_html($provider->name); ?></option>
+                                    <option value="<?php echo esc_attr($provider->name); ?>" <?php selected($settings->defaultProviderName, $provider->name); ?>><?php echo esc_html(IntelliSend_Database::get_provider_label($provider)); ?></option>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </select>
                         <span class="field-description"><?php echo esc_html__('Changes are saved automatically when you select a different provider.', 'intellisend'); ?></span>
+                    <?php if (empty($providers)) : ?>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=intellisend-providers')); ?>"><?php echo esc_html__('Configure an email provider', 'intellisend'); ?></a>
+                    <?php endif; ?>
                     </div>
 
                     <div class="intellisend-settings-field">

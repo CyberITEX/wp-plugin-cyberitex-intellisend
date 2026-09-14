@@ -20,6 +20,65 @@ if (!defined('WPINC')) {
  */
 class IntelliSend_Ajax
 {
+    /** Read one WordPress request value without corrupting escaped credentials. */
+    private static function post_string($key, $default = '')
+    {
+        return isset($_POST[$key]) && is_string($_POST[$key])
+            ? wp_unslash($_POST[$key]) : $default;
+    }
+
+    /** Only a nonce issued for this user/session may authorise an AJAX request. */
+    private static function verify_nonce($actions)
+    {
+        $nonce = self::post_string('nonce');
+        if ('' === $nonce) {
+            return false;
+        }
+        foreach ((array) $actions as $action) {
+            if (wp_verify_nonce($nonce, $action)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Validate routing values before creating or changing a delivery rule. */
+    private static function validate_routing_input($data, $is_default = false)
+    {
+        foreach ($data as $value) {
+            if (!is_scalar($value)) {
+                return __('Invalid routing form data.', 'intellisend');
+            }
+        }
+        $provider = IntelliSend_Database::get_provider_by_name(isset($data['default_provider_name']) ? $data['default_provider_name'] : '');
+        if (!$provider || empty($provider->configured)) {
+            return __('Choose a configured provider.', 'intellisend');
+        }
+        if (!empty($data['recipients'])) {
+            foreach (explode(',', $data['recipients']) as $recipient) {
+                if (!is_email(trim($recipient))) {
+                    return __('Enter valid recipient email addresses separated by commas.', 'intellisend');
+                }
+            }
+        }
+        if (!$is_default && isset($data['priority']) && (!preg_match('/^\d+$/', (string) $data['priority']) || (float) $data['priority'] > 2147483647)) {
+            return __('Priority must be a non-negative whole number.', 'intellisend');
+        }
+        $type = isset($data['pattern_type']) ? strtolower($data['pattern_type']) : 'wildcard';
+        if (!$is_default && 'regex' === $type) {
+            $patterns = IntelliSend_Form::parse_subject_patterns(isset($data['subject_patterns']) ? $data['subject_patterns'] : '', $type);
+            if (empty($patterns)) {
+                return __('At least one pattern is required.', 'intellisend');
+            }
+            foreach ($patterns as $pattern) {
+                if (false === @preg_match('/' . $pattern . '/i', '')) {
+                    return __('Enter a valid regular expression without delimiters.', 'intellisend');
+                }
+            }
+        }
+        return '';
+    }
+
     /**
      * Initialize AJAX hooks
      */
@@ -30,6 +89,8 @@ class IntelliSend_Ajax
 
         // Direct action handlers
         add_action('wp_ajax_intellisend_save_provider', array(__CLASS__, 'handle_save_provider'));
+        add_action('wp_ajax_intellisend_check_provider_api_key', array(__CLASS__, 'handle_check_provider_api_key'));
+        add_action('wp_ajax_intellisend_send_test_email', array(__CLASS__, 'handle_send_test_email'));
         add_action('wp_ajax_intellisend_save_routing_rule', array(__CLASS__, 'handle_save_routing_rule'));
         add_action('wp_ajax_intellisend_get_report', array(__CLASS__, 'handle_get_report'));
         add_action('wp_ajax_intellisend_delete_reports', array(__CLASS__, 'handle_delete_reports'));
@@ -132,7 +193,7 @@ class IntelliSend_Ajax
         }
 
         // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_settings')) {
+        if (!self::verify_nonce('intellisend_settings')) {
             wp_send_json_error(array('message' => esc_html__('Security check failed.', 'intellisend')));
             return;
         }
@@ -143,7 +204,7 @@ class IntelliSend_Ajax
         }
 
         // Get the action
-        $action = sanitize_text_field($_POST['sub_action']);
+        $action = sanitize_text_field(self::post_string('sub_action'));
 
         switch ($action) {
             case 'settings_saved':
@@ -163,6 +224,9 @@ class IntelliSend_Ajax
                 break;
             case 'get_smtp_providers':
                 self::handle_get_smtp_providers();
+                break;
+            case 'provider_api_key_checked':
+                self::handle_provider_api_key_check();
                 break;
             default:
                 wp_send_json_error(array('message' => esc_html__('Invalid action.', 'intellisend-form')));
@@ -262,12 +326,13 @@ class IntelliSend_Ajax
 
         // Process and save only anti-spam settings
         $settings = array(
-            'antiSpamEndPoint'     => isset($_POST['antiSpamEndPoint']) ? esc_url_raw($_POST['antiSpamEndPoint']) : 'https://api.cyberitex.com/v1/tools/SpamCheck',
+            'antiSpamEndPoint'     => isset($_POST['antiSpamEndPoint']) ? esc_url_raw(self::post_string('antiSpamEndPoint')) : 'https://api.cyberitex.com/v1/tools/SpamCheck',
         );
 
         // Only update API key if a new one is provided
-        if (isset($_POST['antiSpamApiKey']) && !empty($_POST['antiSpamApiKey'])) {
-            $settings['antiSpamApiKey'] = sanitize_text_field($_POST['antiSpamApiKey']);
+        $api_key = self::post_string('antiSpamApiKey');
+        if ('' !== $api_key) {
+            $settings['antiSpamApiKey'] = $api_key;
         }
 
         // Save settings to database
@@ -292,8 +357,8 @@ class IntelliSend_Ajax
         }
 
         // Get the API key
-        $api_key = isset($_POST['api_key']) ? sanitize_text_field($_POST['api_key']) : '';
-        $endpoint = isset($_POST['endpoint']) ? esc_url_raw($_POST['endpoint']) : '';
+        $api_key = isset($_POST['api_key']) ? self::post_string('api_key') : '';
+        $endpoint = isset($_POST['endpoint']) ? esc_url_raw(self::post_string('endpoint')) : '';
 
         if (empty($api_key)) {
             wp_send_json_error(array('message' => esc_html__('API key is required.', 'intellisend-form')));
@@ -371,7 +436,7 @@ class IntelliSend_Ajax
         }
 
         // Get the test email address
-        $test_email_address = isset($_POST['test_email']) ? sanitize_email($_POST['test_email']) : '';
+        $test_email_address = isset($_POST['test_email']) ? sanitize_email(self::post_string('test_email')) : '';
 
         // If no test email is provided, use the default recipient from settings
         if (empty($test_email_address)) {
@@ -379,13 +444,13 @@ class IntelliSend_Ajax
             $test_email_address = $settings->testRecipient;
         }
 
-        if (empty($test_email_address)) {
+        if (empty($test_email_address) || !is_email($test_email_address)) {
             wp_send_json_error(array('message' => esc_html__('Please provide a valid email address for testing.', 'intellisend-form')));
             return;
         }
 
         // Get the provider ID from the request or use the default
-        $provider_id = isset($_POST['provider_id']) ? sanitize_text_field($_POST['provider_id']) : '';
+        $provider_id = isset($_POST['provider_id']) ? sanitize_text_field(self::post_string('provider_id')) : '';
         $provider = null;
 
         if (!empty($provider_id)) {
@@ -399,78 +464,88 @@ class IntelliSend_Ajax
         }
 
         if (!$provider) {
-            wp_send_json_error(array('message' => esc_html__('SMTP provider not found. Please configure a provider first.', 'intellisend-form')));
+            wp_send_json_error(array('message' => esc_html__('Provider not found. Please configure a provider first.', 'intellisend-form')));
+            return;
+        }
+
+        // Fail fast with something readable instead of an SMTP timeout or a
+        // credential error from the vendor.
+        if (empty($provider->configured)) {
+            wp_send_json_error(array(
+                'message' => sprintf(
+                    esc_html__('%s is not configured yet. Save its credentials before sending a test.', 'intellisend'),
+                    esc_html(IntelliSend_Database::get_provider_label($provider))
+                ),
+            ));
             return;
         }
 
         // Set up the email
         $to = $test_email_address;
         $subject = '[CyberITEX] IntelliSend Test Email';
-        $message = 'This is a test email from IntelliSend using provider "' . $provider->name . '". If you received this, your SMTP settings are working correctly.';
+        $message = 'This is a test email from IntelliSend using provider "' . $provider->name . '". If you received this, your settings are working correctly.';
         $headers = array(
             'Content-Type: text/html; charset=UTF-8',
             'From: IntelliSend <' . $provider->sender . '>',
         );
 
-        // Configure PHPMailer to use the selected SMTP provider
-        add_filter('wp_mail_from', function ($email) use ($provider) {
-            return $provider->sender;
-        });
+        // API transports never touch PHPMailer, so send them directly.
+        if (IntelliSend_Database::is_api_provider($provider)) {
+            self::send_test_email_via_api($provider, $to, $subject, $message, $headers);
+            return;
+        }
 
-        add_filter('wp_mail_from_name', function ($name) {
-            return 'IntelliSend Test';
-        });
-
-        // Capture debug output
+        // Scope the test configuration to this send, including exceptional exits.
         $debug_output = '';
-
-        // Set a flag to bypass the mail interception for test emails BEFORE adding hooks
-        $GLOBALS['intellisend_test_email'] = true;
-
-        // Temporarily remove ALL IntelliSend hooks to prevent interference
-        remove_filter('wp_mail', array('IntelliSend_Form', 'intercept_email'), 10);
-        remove_action('phpmailer_init', array('IntelliSend_Form', 'configure_phpmailer'), 10);
-        remove_action('wp_mail_succeeded', array('IntelliSend_Form', 'log_email_success'), 10);
-        remove_action('wp_mail_failed', array('IntelliSend_Form', 'log_email_failure'), 10);
-
-        // Configure PHPMailer to use SMTP
-        add_action('phpmailer_init', function ($phpmailer) use ($provider, &$debug_output) {
+        $from_callback = static function () use ($provider) {
+            return $provider->sender;
+        };
+        $name_callback = static function () {
+            return 'IntelliSend Test';
+        };
+        $mailer_callback = static function ($phpmailer) use ($provider, &$debug_output) {
             $phpmailer->isSMTP();
             $phpmailer->Host = $provider->server;
             $phpmailer->Port = $provider->port;
-
-            if ($provider->encryption === 'ssl') {
-                $phpmailer->SMTPSecure = 'ssl';
-            } elseif ($provider->encryption === 'tls') {
-                $phpmailer->SMTPSecure = 'tls';
-            }
-
-            if ($provider->authRequired) {
-                $phpmailer->SMTPAuth = true;
-                $phpmailer->Username = $provider->username;
-                // Decrypt the password before using it
-                $phpmailer->Password = IntelliSend_Database::decrypt_data($provider->password);
+            $phpmailer->SMTPSecure = in_array($provider->encryption, array('ssl', 'tls'), true) ? $provider->encryption : '';
+            $phpmailer->SMTPAuth = (bool) $provider->authRequired;
+            $phpmailer->Username = $phpmailer->SMTPAuth ? $provider->username : '';
+            $phpmailer->Password = $phpmailer->SMTPAuth ? IntelliSend_Database::decrypt_data($provider->password) : '';
+            $phpmailer->SMTPDebug = self::is_debug_enabled() ? 2 : 0;
+            $phpmailer->Debugoutput = static function ($str, $level) use (&$debug_output) {
+                $debug_output .= $str . "\n";
+            };
+        };
+        $had_test_flag = array_key_exists('intellisend_test_email', $GLOBALS);
+        $previous_test_flag = $had_test_flag ? $GLOBALS['intellisend_test_email'] : null;
+        $had_mailer = array_key_exists('phpmailer', $GLOBALS);
+        $previous_mailer = $had_mailer ? $GLOBALS['phpmailer'] : null;
+        $GLOBALS['intellisend_test_email'] = true;
+        unset($GLOBALS['phpmailer']);
+        add_filter('wp_mail_from', $from_callback, PHP_INT_MAX);
+        add_filter('wp_mail_from_name', $name_callback, PHP_INT_MAX);
+        add_action('phpmailer_init', $mailer_callback, PHP_INT_MAX);
+        try {
+            $result = wp_mail($to, $subject, $message, $headers);
+        } catch (Throwable $error) {
+            $result = false;
+            // Third-party exceptions may contain credentials; do not return them.
+            $debug_output = 'The mail transport raised an error while sending the test.';
+        } finally {
+            remove_filter('wp_mail_from', $from_callback, PHP_INT_MAX);
+            remove_filter('wp_mail_from_name', $name_callback, PHP_INT_MAX);
+            remove_action('phpmailer_init', $mailer_callback, PHP_INT_MAX);
+            if ($had_test_flag) {
+                $GLOBALS['intellisend_test_email'] = $previous_test_flag;
             } else {
-                $phpmailer->SMTPAuth = false;
+                unset($GLOBALS['intellisend_test_email']);
             }
-
-            // Use debug setting from database
-            if (self::is_debug_enabled()) {
-                $phpmailer->SMTPDebug = 2;
-                $phpmailer->Debugoutput = function ($str, $level) use (&$debug_output) {
-                    $debug_output .= $str . "\n";
-                };
+            if ($had_mailer) {
+                $GLOBALS['phpmailer'] = $previous_mailer;
+            } else {
+                unset($GLOBALS['phpmailer']);
             }
-        });
-
-        // Send the test email
-        $result = wp_mail($to, $subject, $message, $headers);
-
-        // Restore ALL IntelliSend hooks
-        add_filter('wp_mail', array('IntelliSend_Form', 'intercept_email'), 10);
-        add_action('phpmailer_init', array('IntelliSend_Form', 'configure_phpmailer'), 10);
-        add_action('wp_mail_succeeded', array('IntelliSend_Form', 'log_email_success'), 10);
-        add_action('wp_mail_failed', array('IntelliSend_Form', 'log_email_failure'), 10);
+        }
 
         // Extract and log only the error part if there is an error
         if (!$result && !empty($debug_output)) {
@@ -482,9 +557,6 @@ class IntelliSend_Ajax
                 $debug_output = $matches[1];
             }
         }
-
-        // Reset the flag
-        $GLOBALS['intellisend_test_email'] = false;
 
         // Collect debug information
         $error_details = "";
@@ -529,6 +601,141 @@ class IntelliSend_Ajax
     }
 
     /**
+     * Send a test email through an API provider and log the result.
+     *
+     * @param object $provider Provider row (type = 'api').
+     * @param string $to       Recipient address.
+     * @param string $subject  Subject line.
+     * @param string $message  Body.
+     * @param array  $headers  wp_mail style headers.
+     */
+    private static function send_test_email_via_api($provider, $to, $subject, $message, $headers)
+    {
+        global $wpdb;
+
+        $transport = IntelliSend_Api_Transport::for_provider($provider);
+
+        if (!$transport) {
+            wp_send_json_error(array(
+                'message' => sprintf(
+                    esc_html__('No API transport is registered for the provider "%s".', 'intellisend'),
+                    esc_html($provider->name)
+                ),
+            ));
+            return;
+        }
+
+        $result = $transport::send(
+            $provider,
+            array(
+                'to'      => $to,
+                'subject' => $subject,
+                'message' => $message,
+                'headers' => $headers,
+            )
+        );
+
+        $wpdb->insert(
+            $wpdb->prefix . 'intellisend_reports',
+            array(
+                'date'            => current_time('mysql'),
+                'subject'         => $subject,
+                'sender'          => $provider->sender,
+                'recipients'      => $to,
+                'message'         => $message,
+                'status'          => $result['success'] ? 'sent' : 'failed',
+                'log'             => $result['log'],
+                'antiSpamEnabled' => 0,
+                'isSpam'          => 0,
+                'providerName'    => $provider->name,
+            )
+        );
+
+        if ($result['success']) {
+            wp_send_json_success(array(
+                'message' => sprintf(
+                    esc_html__('Test email accepted by %s.', 'intellisend'),
+                    esc_html($transport::get_label())
+                ),
+                'debug'   => $result['log'],
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => $result['message'],
+                'debug'   => $result['log'],
+            ));
+        }
+    }
+
+    /**
+     * AJAX entry point for the providers page "Send Test Email" button.
+     *
+     * handle_test_email() already accepts any provider by name, so a provider
+     * can be tested where it was configured without first being promoted to the
+     * site default.
+     */
+    public static function handle_send_test_email()
+    {
+        if (!self::verify_nonce(array('intellisend_providers', 'intellisend_settings'))) {
+            wp_send_json_error(array('message' => esc_html__('Security check failed.', 'intellisend')));
+            return;
+        }
+
+        self::handle_test_email();
+    }
+
+    /**
+     * AJAX entry point for the providers page "Test API Key" button.
+     */
+    public static function handle_check_provider_api_key()
+    {
+        if (!self::verify_nonce(array('intellisend_providers', 'intellisend_settings'))) {
+            wp_send_json_error(array('message' => esc_html__('Security check failed.', 'intellisend')));
+            return;
+        }
+
+        self::handle_provider_api_key_check();
+    }
+
+    /**
+     * Validate the API key of an API-transport provider.
+     */
+    private static function handle_provider_api_key_check()
+    {
+        // Verify user permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => esc_html__('You do not have permission to perform this action.', 'intellisend')));
+            return;
+        }
+
+        $provider_name = isset($_POST['provider_name']) ? sanitize_text_field(self::post_string('provider_name')) : '';
+        $transport = IntelliSend_Api_Transport::for_provider($provider_name);
+
+        if (!$transport) {
+            wp_send_json_error(array(
+                'message' => sprintf(
+                    esc_html__('No API transport is registered for the provider "%s".', 'intellisend'),
+                    esc_html($provider_name)
+                ),
+            ));
+            return;
+        }
+
+        $provider = IntelliSend_Database::get_provider_by_name($provider_name);
+
+        // An empty key means "test whatever is already configured".
+        $api_key = isset($_POST['api_key']) ? self::post_string('api_key') : '';
+
+        $result = $transport::validate_api_key($api_key, $provider);
+
+        if ($result['success']) {
+            wp_send_json_success(array('message' => $result['message']));
+        } else {
+            wp_send_json_error(array('message' => $result['message']));
+        }
+    }
+
+    /**
      * Handle spam test submission.
      */
     private static function handle_spam_test()
@@ -540,9 +747,9 @@ class IntelliSend_Ajax
         }
 
         // Get the API key, endpoint and test message from the request
-        $api_key = isset($_POST['api_key']) ? sanitize_text_field($_POST['api_key']) : '';
-        $endpoint = isset($_POST['endpoint']) ? esc_url_raw($_POST['endpoint']) : '';
-        $message = isset($_POST['message']) ? sanitize_textarea_field($_POST['message']) : '';
+        $api_key = isset($_POST['api_key']) ? self::post_string('api_key') : '';
+        $endpoint = isset($_POST['endpoint']) ? esc_url_raw(self::post_string('endpoint')) : '';
+        $message = isset($_POST['message']) ? sanitize_textarea_field(self::post_string('message')) : '';
         $use_existing_key = isset($_POST['use_existing_key']) && $_POST['use_existing_key'] == 1;
 
         // If using existing key and no new key provided, get it from the database
@@ -566,17 +773,8 @@ class IntelliSend_Ajax
             return;
         }
 
-        // Temporarily update settings for this test
-        $settings = IntelliSend_Database::get_settings();
-        $original_endpoint = $settings->antiSpamEndPoint;
-        $settings->antiSpamEndPoint = $endpoint;
-
-        // Check if the message is spam using the provided API key
         $spam_checker = new IntelliSend_SpamCheck();
-        $spam_result = $spam_checker->check($message, $api_key);
-
-        // Restore original endpoint setting
-        $settings->antiSpamEndPoint = $original_endpoint;
+        $spam_result = $spam_checker->check($message, $api_key, $endpoint);
 
         if (isset($spam_result['success']) && $spam_result['success']) {
             // Send success response with spam check results
@@ -600,11 +798,10 @@ class IntelliSend_Ajax
         // Enable debugging
         if (self::is_debug_enabled()) {
             self::debug_log('=== INTELLISEND ADD ROUTING RULE START ===');
-            self::debug_log('POST data: ' . print_r($_POST, true));
         }
 
         // Check nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
+        if (!self::verify_nonce('intellisend_routing_nonce')) {
             if (self::is_debug_enabled()) {
                 self::debug_log('Nonce validation failed in handle_add_routing_rule');
             }
@@ -631,9 +828,11 @@ class IntelliSend_Ajax
         }
 
         $formData = array();
-        parse_str($_POST['formData'], $formData);
-        if (self::is_debug_enabled()) {
-            self::debug_log('Parsed form data: ' . print_r($formData, true));
+        parse_str(self::post_string('formData'), $formData);
+        $validation_error = self::validate_routing_input($formData);
+        if ('' !== $validation_error) {
+            wp_send_json_error($validation_error);
+            return;
         }
 
         // Validate required fields
@@ -673,10 +872,6 @@ class IntelliSend_Ajax
         $rule->enabled = isset($formData['enabled']) ? absint($formData['enabled']) : 1;
         $rule->anti_spam_enabled = isset($formData['anti_spam_enabled']) ? absint($formData['anti_spam_enabled']) : 1;
 
-        if (self::is_debug_enabled()) {
-            self::debug_log('Add - Final rule object: ' . print_r($rule, true));
-        }
-
         // Create the routing rule
         $result = IntelliSend_Database::create_routing_rule($rule);
         if (self::is_debug_enabled()) {
@@ -705,7 +900,6 @@ class IntelliSend_Ajax
         // Enable detailed debugging
         if (self::is_debug_enabled()) {
             self::debug_log('=== INTELLISEND UPDATE ROUTING RULE START ===');
-            self::debug_log('POST data: ' . print_r($_POST, true));
         }
 
         // Check nonce
@@ -717,11 +911,7 @@ class IntelliSend_Ajax
             return;
         }
 
-        $received_nonce = $_POST['nonce'];
-        if (self::is_debug_enabled()) {
-            self::debug_log('Received nonce: ' . $received_nonce);
-        }
-
+        $received_nonce = self::post_string('nonce');
         // Try both the routing nonce and the ajax nonce for backward compatibility
         $is_routing_nonce_valid = wp_verify_nonce($received_nonce, 'intellisend_routing_nonce');
         $is_ajax_nonce_valid = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
@@ -733,7 +923,6 @@ class IntelliSend_Ajax
 
         if (!$is_routing_nonce_valid && !$is_ajax_nonce_valid) {
             if (self::is_debug_enabled()) {
-                self::debug_log('Invalid nonce in handle_update_routing_rule: ' . $received_nonce);
             }
             wp_send_json_error('Security check failed. Please refresh the page and try again.');
             return;
@@ -757,11 +946,7 @@ class IntelliSend_Ajax
             return;
         }
 
-        $formData = $_POST['formData'];
-        if (self::is_debug_enabled()) {
-            self::debug_log('Raw formData: ' . print_r($formData, true));
-        }
-
+        $formData = isset($_POST['formData']) && is_array($_POST['formData']) ? wp_unslash($_POST['formData']) : self::post_string('formData');
         // Parse form data if it's a string
         if (is_string($formData)) {
             $parsed_data = array();
@@ -769,8 +954,11 @@ class IntelliSend_Ajax
             $formData = $parsed_data;
         }
 
-        if (self::is_debug_enabled()) {
-            self::debug_log('Parsed form data: ' . print_r($formData, true));
+        foreach ($formData as $value) {
+            if (!is_scalar($value)) {
+                wp_send_json_error(__('Invalid routing form data.', 'intellisend'));
+                return;
+            }
         }
 
         // Validate rule ID
@@ -814,12 +1002,14 @@ class IntelliSend_Ajax
             return;
         }
 
-        if (self::is_debug_enabled()) {
-            self::debug_log('Existing rule: ' . print_r($existing_rule, true));
+        // Check if it's a default rule
+        $is_default_rule = ($existing_rule->priority == -1 || (isset($existing_rule->is_default) && $existing_rule->is_default == 1));
+        $validation_error = self::validate_routing_input($formData, $is_default_rule);
+        if ('' !== $validation_error) {
+            wp_send_json_error($validation_error);
+            return;
         }
 
-        // Check if it's a default rule
-        $is_default_rule = ($rule_id == 1 || $existing_rule->priority == -1 || (isset($existing_rule->is_default) && $existing_rule->is_default == 1));
         if (self::is_debug_enabled()) {
             self::debug_log('Is default rule: ' . ($is_default_rule ? 'true' : 'false'));
         }
@@ -841,7 +1031,6 @@ class IntelliSend_Ajax
         }
         if (self::is_debug_enabled()) {
             self::debug_log('Pattern type after validation: ' . $pattern_type);
-            self::debug_log('Valid pattern types: ' . print_r($valid_pattern_types, true));
             self::debug_log('Original pattern_type from form: ' . (isset($formData['pattern_type']) ? $formData['pattern_type'] : 'NOT_SET'));
         }
 
@@ -873,7 +1062,6 @@ class IntelliSend_Ajax
         }
 
         if (self::is_debug_enabled()) {
-            self::debug_log('Final rule object: ' . print_r($rule, true));
             self::debug_log('Rule pattern_type specifically: "' . $rule->pattern_type . '"');
             self::debug_log('Rule pattern_type type: ' . gettype($rule->pattern_type));
         }
@@ -882,10 +1070,6 @@ class IntelliSend_Ajax
         global $wpdb;
         $table = $wpdb->prefix . 'intellisend_routing';
         $current_db_rule = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $rule_id));
-        if (self::is_debug_enabled()) {
-            self::debug_log('Current rule in DB BEFORE update: ' . print_r($current_db_rule, true));
-        }
-
         // Verify database classes are available
         if (!class_exists('IntelliSend_Database')) {
             if (self::is_debug_enabled()) {
@@ -915,7 +1099,6 @@ class IntelliSend_Ajax
         // Check the pattern_type in database AFTER update
         $updated_db_rule = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $rule_id));
         if (self::is_debug_enabled()) {
-            self::debug_log('Updated rule in DB AFTER update: ' . print_r($updated_db_rule, true));
             self::debug_log('Pattern type changed from "' . ($current_db_rule ? $current_db_rule->pattern_type : 'NULL') . '" to "' . ($updated_db_rule ? $updated_db_rule->pattern_type : 'NULL') . '"');
         }
 
@@ -948,7 +1131,7 @@ class IntelliSend_Ajax
     public static function handle_delete_routing_rule()
     {
         // Check nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
+        if (!self::verify_nonce('intellisend_routing_nonce')) {
             if (self::is_debug_enabled()) {
                 self::debug_log('Nonce validation failed in handle_delete_routing_rule');
             }
@@ -995,7 +1178,7 @@ class IntelliSend_Ajax
     public static function handle_activate_routing_rule()
     {
         // Check nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
+        if (!self::verify_nonce('intellisend_routing_nonce')) {
             if (self::is_debug_enabled()) {
                 self::debug_log('Nonce validation failed in handle_activate_routing_rule');
             }
@@ -1053,7 +1236,7 @@ class IntelliSend_Ajax
     public static function handle_deactivate_routing_rule()
     {
         // Check nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_routing_nonce')) {
+        if (!self::verify_nonce('intellisend_routing_nonce')) {
             if (self::is_debug_enabled()) {
                 self::debug_log('Nonce validation failed in handle_deactivate_routing_rule');
             }
@@ -1132,15 +1315,12 @@ class IntelliSend_Ajax
             return;
         }
 
-        $received_nonce = $_POST['nonce'];
+        $received_nonce = self::post_string('nonce');
 
-        // TRANSITION PERIOD: Accept the known nonce value from existing JavaScript
-        $known_legacy_nonce = 'ee86b922eb';
         $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
 
-        if (!$is_valid_nonce && $received_nonce !== $known_legacy_nonce) {
+        if (!$is_valid_nonce) {
             if (self::is_debug_enabled()) {
-                self::debug_log('Invalid nonce in handle_get_report: ' . $received_nonce);
             }
             wp_send_json_error(array(
                 'message' => esc_html__('Security check failed. Please refresh the page and try again.', 'intellisend')
@@ -1243,6 +1423,8 @@ class IntelliSend_Ajax
         $formatted_providers = array();
         foreach ($providers as $provider) {
             $formatted_providers[$provider->name] = array(
+                'type' => IntelliSend_Database::get_provider_type($provider),
+                'label' => IntelliSend_Database::get_provider_label($provider),
                 'server' => $provider->server,
                 'port' => $provider->port,
                 'encryption' => $provider->encryption,
@@ -1250,7 +1432,8 @@ class IntelliSend_Ajax
                 'helpLink' => $provider->helpLink,
                 'authRequired' => (bool) $provider->authRequired,
                 'username' => $provider->username,
-                'password' => $provider->password,
+                'sender' => $provider->sender,
+                'configured' => (int) $provider->configured,
             );
         }
 
@@ -1270,7 +1453,7 @@ class IntelliSend_Ajax
     public static function handle_save_provider()
     {
         // Check nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'intellisend_providers')) {
+        if (!self::verify_nonce('intellisend_providers')) {
             wp_send_json_error(array('message' => esc_html__('Security check failed.', 'intellisend')));
             return;
         }
@@ -1281,31 +1464,158 @@ class IntelliSend_Ajax
             return;
         }
 
-        // Validate required fields
-        if (empty($_POST['provider_name']) || empty($_POST['provider_server']) || empty($_POST['provider_port'])) {
+        if (empty($_POST['provider_name'])) {
             wp_send_json_error(array('message' => esc_html__('Please fill in all required fields.', 'intellisend')));
             return;
         }
+
+        $provider_name = sanitize_text_field(self::post_string('provider_name'));
+
+        // Get provider ID
+        $posted_id = self::post_string('provider_id');
+        if (isset($_POST['provider_id']) && (!is_string($_POST['provider_id']) || ('' !== $posted_id && !ctype_digit($posted_id)))) {
+            wp_send_json_error(array('message' => esc_html__('Invalid provider ID.', 'intellisend')));
+            return;
+        }
+        $provider_id = absint($posted_id);
+
+        // Work out the transport type: an explicit POST value wins, otherwise
+        // fall back to the stored type so an SMTP save never flips a record.
+        $existing_provider = $provider_id > 0
+            ? IntelliSend_Database::get_provider($provider_id)
+            : IntelliSend_Database::get_provider_by_name($provider_name);
+
+        $provider_type = isset($_POST['provider_type'])
+            ? sanitize_text_field(self::post_string('provider_type'))
+            : IntelliSend_Database::get_provider_type($existing_provider);
+
+        if (($provider_id > 0 && !$existing_provider)
+            || !in_array($provider_type, array(IntelliSend_Database::TYPE_API, IntelliSend_Database::TYPE_SMTP), true)
+            || ($existing_provider && ($existing_provider->name !== $provider_name
+                || IntelliSend_Database::get_provider_type($existing_provider) !== $provider_type))) {
+            wp_send_json_error(array('message' => esc_html__('The provider identity does not match the saved provider. Refresh the page and try again.', 'intellisend')));
+            return;
+        }
+        if ($existing_provider) {
+            $provider_id = (int) $existing_provider->id;
+        }
+        $is_api = IntelliSend_Database::TYPE_API === $provider_type;
 
         // Check if there are any configured providers before this operation
         $existing_configured_providers = IntelliSend_Database::get_providers(array('configured' => 1));
         $had_configured_providers = !empty($existing_configured_providers);
 
-        // Prepare provider data
-        $provider_data = array(
-            'name'         => sanitize_text_field($_POST['provider_name']),
-            'server'       => sanitize_text_field($_POST['provider_server']),
-            'port'         => absint($_POST['provider_port']),
-            'encryption'   => 'tls', // Default to TLS
-            'authRequired' => 1,     // Default to requiring authentication
-            'username'     => sanitize_text_field($_POST['provider_username']),
-            'sender'       => !empty($_POST['provider_sender']) ? sanitize_text_field($_POST['provider_sender']) : sanitize_text_field($_POST['provider_username']),
-            'password'     => $_POST['provider_password'], // Will be encrypted by the database class
-            'configured'   => 1      // Mark as configured since all required fields are provided
-        );
+        if ($is_api) {
+            $transport = IntelliSend_Api_Transport::for_provider($provider_name);
 
-        // Get provider ID
-        $provider_id = isset($_POST['provider_id']) && !empty($_POST['provider_id']) ? absint($_POST['provider_id']) : 0;
+            if (!$transport) {
+                wp_send_json_error(array(
+                    'message' => sprintf(
+                        esc_html__('No API transport is registered for the provider "%s".', 'intellisend'),
+                        esc_html($provider_name)
+                    ),
+                ));
+                return;
+            }
+
+            $api_sender = !empty($_POST['provider_sender']) ? sanitize_email(self::post_string('provider_sender')) : '';
+
+            if (empty($api_sender) || !is_email($api_sender)) {
+                wp_send_json_error(array(
+                    'message' => sprintf(
+                        esc_html__('A valid sender email is required. %s', 'intellisend'),
+                        esc_html($transport::get_sender_hint())
+                    ),
+                ));
+                return;
+            }
+
+            $api_key = isset($_POST['provider_api_key']) ? self::post_string('provider_api_key') : '';
+            $has_stored_key = $existing_provider && !empty($existing_provider->apiKey);
+            $has_env_key = '' !== $transport::get_environment_key();
+
+            if (empty($api_key) && !$has_stored_key && !$has_env_key) {
+                wp_send_json_error(array(
+                    'message' => sprintf(
+                        esc_html__('A %1$s is required. Paste one here, or define %2$s in wp-config.php.', 'intellisend'),
+                        esc_html($transport::get_key_label()),
+                        esc_html($transport::get_env_constant())
+                    ),
+                ));
+                return;
+            }
+
+            // Vendors with a credential pair (AWS) also need the non-secret half.
+            // It is not a secret, so it lives in the username column.
+            $api_identity = '';
+
+            if ($transport::requires_identity()) {
+                $api_identity = isset($_POST['provider_api_identity']) ? sanitize_text_field(self::post_string('provider_api_identity')) : '';
+
+                if ('' === $api_identity && '' === $transport::get_identity($existing_provider)) {
+                    wp_send_json_error(array(
+                        'message' => sprintf(
+                            esc_html__('A %1$s is required. Enter one here, or define %2$s in wp-config.php.', 'intellisend'),
+                            esc_html($transport::get_identity_label()),
+                            esc_html($transport::get_identity_constant())
+                        ),
+                    ));
+                    return;
+                }
+            }
+
+            // Only accept an endpoint the transport actually offers, so a
+            // tampered POST cannot redirect mail to an arbitrary host.
+            $regions = $transport::get_regions();
+            $posted_endpoint = isset($_POST['provider_api_endpoint']) ? esc_url_raw(self::post_string('provider_api_endpoint')) : '';
+            $api_endpoint = isset($regions[$posted_endpoint]) ? $posted_endpoint : $transport::get_default_base();
+
+            $provider_data = array(
+                'name'         => $provider_name,
+                'type'         => IntelliSend_Database::TYPE_API,
+                'server'       => '',
+                'port'         => 443,
+                'encryption'   => '',
+                'authRequired' => 1,
+                'username'     => $api_identity,
+                'sender'       => $api_sender,
+                'apiEndpoint'  => $api_endpoint,
+            );
+
+            // Only overwrite the stored key when a new one was typed in.
+            if (!empty($api_key)) {
+                $provider_data['apiKey'] = $api_key; // Encrypted by the database class
+            }
+        } else {
+            $server = sanitize_text_field(self::post_string('provider_server'));
+            $posted_port = self::post_string('provider_port');
+            $port = ctype_digit($posted_port) ? (int) $posted_port : 0;
+            $username = sanitize_text_field(self::post_string('provider_username'));
+            $sender = self::post_string('provider_sender');
+            $sender = '' !== $sender ? $sender : $username;
+            if ('' === $server || preg_match('/[\s\/\\\\]/', $server) || $port < 1 || $port > 65535 || !is_email($sender)) {
+                wp_send_json_error(array('message' => esc_html__('Enter a valid SMTP server, port and sender email address.', 'intellisend')));
+                return;
+            }
+            $encryption = 465 === $port ? 'ssl' : 'tls';
+            if (465 !== $port && $existing_provider && (int) $existing_provider->port === $port) {
+                $encryption = $existing_provider->encryption;
+            }
+            $provider_data = array(
+                'name' => $provider_name,
+                'type' => IntelliSend_Database::TYPE_SMTP,
+                'server' => $server,
+                'port' => $port,
+                'encryption' => $encryption,
+                'authRequired' => $existing_provider ? (int) $existing_provider->authRequired : 1,
+                'username' => $username,
+                'sender' => sanitize_email($sender),
+            );
+            $password = self::post_string('provider_password');
+            if ('' !== $password) {
+                $provider_data['password'] = $password; // Encrypted by database class.
+            }
+        }
 
         // Check if this should be the default provider
         $set_as_default = isset($_POST['is_default']) && $_POST['is_default'] == '1';
@@ -1358,7 +1668,14 @@ class IntelliSend_Ajax
 
         // Return response
         if ($result) {
-            wp_send_json_success(array('message' => $message));
+            $saved = IntelliSend_Database::get_provider_by_name($provider_data['name']);
+
+            wp_send_json_success(array(
+                'message'    => $message,
+                'label'      => IntelliSend_Database::get_provider_label($provider_data['name']),
+                'type'       => $saved ? IntelliSend_Database::get_provider_type($saved) : $provider_type,
+                'configured' => $saved ? (int) $saved->configured : 0,
+            ));
         } else {
             wp_send_json_error(array('message' => esc_html__('An error occurred while saving the provider.', 'intellisend')));
         }
@@ -1391,15 +1708,12 @@ class IntelliSend_Ajax
             return;
         }
 
-        $received_nonce = $_POST['nonce'];
+        $received_nonce = self::post_string('nonce');
 
-        // TRANSITION PERIOD: Accept the known nonce value from existing JavaScript
-        $known_legacy_nonce = 'ee86b922eb';
         $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
 
-        if (!$is_valid_nonce && $received_nonce !== $known_legacy_nonce) {
+        if (!$is_valid_nonce) {
             if (self::is_debug_enabled()) {
-                self::debug_log('Invalid nonce in handle_delete_reports: ' . $received_nonce);
             }
             wp_send_json_error(array(
                 'message' => esc_html__('Security check failed. Please refresh the page and try again.', 'intellisend')
@@ -1415,7 +1729,13 @@ class IntelliSend_Ajax
             return;
         }
 
-        $report_ids = array_map('intval', $_POST['ids']);
+        foreach ($_POST['ids'] as $id) {
+            if (!is_string($id) || !ctype_digit($id) || (int) $id < 1) {
+                wp_send_json_error(array('message' => esc_html__('Invalid report IDs.', 'intellisend')));
+                return;
+            }
+        }
+        $report_ids = array_unique(array_map('intval', $_POST['ids']));
         if (empty($report_ids)) {
             wp_send_json_error(array(
                 'message' => esc_html__('No valid report IDs provided.', 'intellisend')
@@ -1473,15 +1793,12 @@ class IntelliSend_Ajax
             return;
         }
 
-        $received_nonce = $_POST['nonce'];
+        $received_nonce = self::post_string('nonce');
 
-        // TRANSITION PERIOD: Accept the known nonce value from existing JavaScript
-        $known_legacy_nonce = 'ee86b922eb';
         $is_valid_nonce = wp_verify_nonce($received_nonce, 'intellisend_ajax_nonce');
 
-        if (!$is_valid_nonce && $received_nonce !== $known_legacy_nonce) {
+        if (!$is_valid_nonce) {
             if (self::is_debug_enabled()) {
-                self::debug_log('Invalid nonce in handle_delete_all_reports: ' . $received_nonce);
             }
             wp_send_json_error(array(
                 'message' => esc_html__('Security check failed. Please refresh the page and try again.', 'intellisend')

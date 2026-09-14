@@ -39,6 +39,18 @@ class IntelliSend_Database
 {
 
     /**
+     * Schema version. Bump this whenever the table structure changes so
+     * maybe_upgrade() runs the migration on installs updated in place.
+     */
+    const DB_VERSION = '1.2.0';
+
+    /**
+     * Transport type constants for the providers table.
+     */
+    const TYPE_SMTP = 'smtp';
+    const TYPE_API  = 'api';
+
+    /**
      * Encrypt sensitive data
      * 
      * @param string $data Data to encrypt
@@ -123,7 +135,7 @@ class IntelliSend_Database
         $charset_collate = $wpdb->get_charset_collate();
 
         $routing_table = $wpdb->prefix . 'intellisend_routing';
-        $sql = "CREATE TABLE IF NOT EXISTS $routing_table (
+        $sql = "CREATE TABLE $routing_table (
         id bigint(20) NOT NULL AUTO_INCREMENT,
         name varchar(100) NOT NULL,
         pattern_type enum('wildcard','starts_with','contains','ends_with','regex') DEFAULT 'wildcard',
@@ -136,7 +148,7 @@ class IntelliSend_Database
         is_default tinyint(1) DEFAULT 0,
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
+        PRIMARY KEY  (id),
         KEY name (name),
         KEY enabled (enabled),
         KEY priority (priority),
@@ -187,9 +199,10 @@ class IntelliSend_Database
 
             // Create providers table
             $providers_table = $wpdb->prefix . 'intellisend_providers';
-            $sql = "CREATE TABLE IF NOT EXISTS $providers_table (
+            $sql = "CREATE TABLE $providers_table (
                 id bigint(20) NOT NULL AUTO_INCREMENT,
                 name varchar(100) NOT NULL,
+                type varchar(20) NOT NULL DEFAULT 'smtp',
                 description text,
                 helpLink varchar(255),
                 server varchar(255) NOT NULL,
@@ -199,110 +212,18 @@ class IntelliSend_Database
                 sender varchar(255),
                 username varchar(255),
                 password varchar(255),
+                apiKey varchar(500),
+                apiEndpoint varchar(255),
                 configured tinyint(1) DEFAULT 0,
                 PRIMARY KEY  (id),
-                KEY name (name)
+                KEY name (name),
+                KEY type (type)
             ) $charset_collate;";
             dbDelta($sql);
 
-            // Insert default providers if the table is empty
-            $count = $wpdb->get_var("SELECT COUNT(*) FROM $providers_table");
-            if ($count == 0) {
-                $default_providers = array(
-                    array(
-                        'name' => 'google',
-                        'server' => 'smtp.gmail.com',
-                        'port' => '587',
-                        'encryption' => 'tls',
-                        'username' => '',
-                        'password' => '',
-                        'description' => 'App Password is required',
-                        'helpLink' => 'https://support.google.com/mail/answer/185833',
-                        'authRequired' => 1,
-                        'configured' => 0,
-                    ),
-                    array(
-                        'name' => 'microsoft',
-                        'server' => 'smtp.office365.com',
-                        'port' => '587',
-                        'encryption' => 'tls',
-                        'username' => '',
-                        'password' => '',
-                        'description' => 'App Password is required',
-                        'helpLink' => 'https://support.microsoft.com/en-us/account-billing/manage-app-passwords-for-two-step-verification-d6dc8c6d-4bf7-4851-ad95-6d07799387e9',
-                        'authRequired' => 1,
-                        'configured' => 0,
-                    ),
-                    array(
-                        'name' => 'yahoo',
-                        'server' => 'smtp.mail.yahoo.com',
-                        'port' => '587',
-                        'encryption' => 'tls',
-                        'username' => '',
-                        'password' => '',
-                        'description' => 'App Password is required',
-                        'helpLink' => 'https://help.yahoo.com/kb/SLN15241.html',
-                        'authRequired' => 1,
-                        'configured' => 0,
-                    ),
-                    array(
-                        'name' => 'zoho',
-                        'server' => 'smtp.zoho.com',
-                        'port' => '587',
-                        'encryption' => 'tls',
-                        'username' => '',
-                        'password' => '',
-                        'description' => 'Use your Zoho Mail address and password.',
-                        'helpLink' => 'https://www.zoho.com/mail/help/zoho-smtp.html',
-                        'authRequired' => 1,
-                        'configured' => 0,
-                    ),
-                    array(
-                        'name' => 'mailchimp',
-                        'server' => 'smtp.mandrillapp.com',
-                        'port' => '587',
-                        'encryption' => 'tls',
-                        'username' => '',
-                        'password' => '',
-                        'description' => 'Use your API key as the password.',
-                        'helpLink' => 'https://mailchimp.com/developer/transactional/docs/smtp-integration/',
-                        'authRequired' => 1,
-                        'configured' => 0,
-                    ),
-                    array(
-                        'name' => 'sendgrid',
-                        'server' => 'smtp.sendgrid.net',
-                        'port' => '587',
-                        'encryption' => 'tls',
-                        'username' => '',
-                        'password' => '',
-                        'description' => 'Use "apikey" as username and your API key as password.',
-                        'helpLink' => 'https://www.twilio.com/docs/sendgrid/for-developers/sending-email/integrating-with-the-smtp-api',
-                        'authRequired' => 1,
-                        'configured' => 0,
-                    ),
-                    array(
-                        'name' => 'other',
-                        'server' => '',
-                        'port' => '587',
-                        'encryption' => 'tls',
-                        'username' => '',
-                        'password' => '',
-                        'description' => 'Enter your custom SMTP server details.',
-                        'helpLink' => '',
-                        'authRequired' => 1,
-                        'configured' => 0,
-                    )
-                );
-
-                foreach ($default_providers as $provider) {
-                    $wpdb->insert($providers_table, $provider);
-                }
-            }
-
             // Create settings table
             $settings_table = $wpdb->prefix . 'intellisend_settings';
-            $sql = "CREATE TABLE IF NOT EXISTS $settings_table (
+            $sql = "CREATE TABLE $settings_table (
                 id bigint(20) NOT NULL AUTO_INCREMENT,
                 defaultProviderName varchar(100),
                 antiSpamEndPoint varchar(255),
@@ -340,7 +261,7 @@ class IntelliSend_Database
 
             // Create reports table
             $reports_table = $wpdb->prefix . 'intellisend_reports';
-            $sql = "CREATE TABLE IF NOT EXISTS $reports_table (
+            $sql = "CREATE TABLE $reports_table (
                 id bigint(20) NOT NULL AUTO_INCREMENT,
                 date datetime NOT NULL,
                 subject varchar(255) NOT NULL,
@@ -359,6 +280,11 @@ class IntelliSend_Database
                 KEY isSpam (isSpam)
             ) $charset_collate;";
             dbDelta($sql);
+
+            // New columns and new built-in providers, for fresh and upgraded installs alike.
+            self::ensure_provider_columns();
+            self::backfill_provider_types();
+            self::seed_missing_providers();
         } catch (Exception $e) {
             // Log the error or store it for later display
             error_log('IntelliSend Database Error: ' . $e->getMessage());
@@ -366,6 +292,295 @@ class IntelliSend_Database
         }
 
         return true;
+    }
+
+    /**
+     * Run schema upgrades when the stored schema version is behind the code.
+     *
+     * create_tables() only runs on activation, so this keeps installs that were
+     * updated in place (FTP, Git pull, auto-update) from missing new columns.
+     */
+    public static function maybe_upgrade()
+    {
+        if (defined('INTELLISEND_ACTIVATING')) {
+            return;
+        }
+
+        if (get_option('intellisend_db_version') === self::DB_VERSION) {
+            return;
+        }
+
+        // create_tables() creates anything missing and runs the explicit
+        // column migrations for tables that already exist.
+        self::create_tables();
+
+        update_option('intellisend_db_version', self::DB_VERSION);
+    }
+
+    /**
+     * Add the API transport columns to an existing providers table.
+     *
+     * dbDelta() handles this for the canonical "CREATE TABLE" form used above,
+     * but it is finicky about statement formatting and silently emits nothing
+     * when it cannot parse a definition. These columns hold credentials, so
+     * they are added explicitly rather than left to that inference.
+     */
+    private static function ensure_provider_columns()
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'intellisend_providers';
+
+        $columns = $wpdb->get_col("SHOW COLUMNS FROM $table");
+
+        if (empty($columns)) {
+            return;
+        }
+
+        // Ordered: apiEndpoint is positioned after apiKey, so apiKey goes first.
+        $additions = array(
+            'type'        => "ALTER TABLE $table ADD COLUMN type varchar(20) NOT NULL DEFAULT 'smtp' AFTER name",
+            'apiKey'      => "ALTER TABLE $table ADD COLUMN apiKey varchar(500) NULL AFTER password",
+            'apiEndpoint' => "ALTER TABLE $table ADD COLUMN apiEndpoint varchar(255) NULL AFTER apiKey",
+        );
+
+        foreach ($additions as $column => $sql) {
+            if (! in_array($column, $columns, true)) {
+                $wpdb->query($sql);
+            }
+        }
+
+        // Index the transport type so filtered provider lookups stay cheap.
+        $has_type_index = $wpdb->get_var($wpdb->prepare("SHOW INDEX FROM $table WHERE Key_name = %s", 'type'));
+
+        if (empty($has_type_index)) {
+            $wpdb->query("ALTER TABLE $table ADD KEY type (type)");
+        }
+    }
+
+    /**
+     * Give every legacy provider row an explicit transport type.
+     */
+    private static function backfill_provider_types()
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'intellisend_providers';
+
+        $wpdb->query("UPDATE $table SET type = 'smtp' WHERE type IS NULL OR type = ''");
+    }
+
+    /**
+     * The built-in providers shipped with the plugin.
+     *
+     * Keyed by provider name. SMTP entries are PHPMailer presets; entries with
+     * type = 'api' are HTTP transports and must have a matching class in
+     * IntelliSend_Api_Transport::registry().
+     *
+     * @return array
+     */
+    public static function get_default_providers()
+    {
+        return array(
+            'google' => array(
+                'name' => 'google',
+                'type' => self::TYPE_SMTP,
+                'server' => 'smtp.gmail.com',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => '',
+                'password' => '',
+                'description' => 'App Password is required',
+                'helpLink' => 'https://support.google.com/mail/answer/185833',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'microsoft' => array(
+                'name' => 'microsoft',
+                'type' => self::TYPE_SMTP,
+                'server' => 'smtp.office365.com',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => '',
+                'password' => '',
+                'description' => 'App Password is required',
+                'helpLink' => 'https://support.microsoft.com/en-us/account-billing/manage-app-passwords-for-two-step-verification-d6dc8c6d-4bf7-4851-ad95-6d07799387e9',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'yahoo' => array(
+                'name' => 'yahoo',
+                'type' => self::TYPE_SMTP,
+                'server' => 'smtp.mail.yahoo.com',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => '',
+                'password' => '',
+                'description' => 'App Password is required',
+                'helpLink' => 'https://help.yahoo.com/kb/SLN15241.html',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'zoho' => array(
+                'name' => 'zoho',
+                'type' => self::TYPE_SMTP,
+                'server' => 'smtp.zoho.com',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => '',
+                'password' => '',
+                'description' => 'Use your Zoho Mail address and password.',
+                'helpLink' => 'https://www.zoho.com/mail/help/zoho-smtp.html',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'mailchimp' => array(
+                'name' => 'mailchimp',
+                'type' => self::TYPE_SMTP,
+                'server' => 'smtp.mandrillapp.com',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => '',
+                'password' => '',
+                'description' => 'Use your API key as the password.',
+                'helpLink' => 'https://mailchimp.com/developer/transactional/docs/smtp-integration/',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'sendgrid' => array(
+                'name' => 'sendgrid',
+                'type' => self::TYPE_SMTP,
+                'server' => 'smtp.sendgrid.net',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => '',
+                'password' => '',
+                'description' => 'Use "apikey" as username and your API key as password.',
+                'helpLink' => 'https://www.twilio.com/docs/sendgrid/for-developers/sending-email/integrating-with-the-smtp-api',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'sendgrid-api' => array(
+                'name' => 'sendgrid-api',
+                'type' => self::TYPE_API,
+                'server' => '',
+                'port' => 443,
+                'encryption' => '',
+                'username' => '',
+                'password' => '',
+                'apiKey' => '',
+                'apiEndpoint' => 'https://api.sendgrid.com',
+                'description' => 'Sends over the SendGrid Web API v3 (HTTPS), so no SMTP ports are needed. Paste an API key with Mail Send permission.',
+                'helpLink' => 'https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'brevo' => array(
+                'name' => 'brevo',
+                'type' => self::TYPE_SMTP,
+                'server' => 'smtp-relay.brevo.com',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => '',
+                'password' => '',
+                'description' => 'Use your Brevo SMTP login as username and an SMTP key as password (not your account password).',
+                'helpLink' => 'https://help.brevo.com/hc/en-us/articles/209462765-Send-your-first-transactional-email-via-SMTP',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'brevo-api' => array(
+                'name' => 'brevo-api',
+                'type' => self::TYPE_API,
+                'server' => '',
+                'port' => 443,
+                'encryption' => '',
+                'username' => '',
+                'password' => '',
+                'apiKey' => '',
+                'apiEndpoint' => 'https://api.brevo.com',
+                'description' => 'Sends over the Brevo transactional email API (HTTPS), so no SMTP ports are needed. Paste an API v3 key.',
+                'helpLink' => 'https://developers.brevo.com/reference/sendtransacemail',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'ses' => array(
+                'name' => 'ses',
+                'type' => self::TYPE_SMTP,
+                'server' => 'email-smtp.us-east-1.amazonaws.com',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => '',
+                'password' => '',
+                'description' => 'Use SES SMTP credentials, not your AWS keys. Edit the server host to match your SES region.',
+                'helpLink' => 'https://docs.aws.amazon.com/ses/latest/dg/send-email-smtp.html',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'ses-api' => array(
+                'name' => 'ses-api',
+                'type' => self::TYPE_API,
+                'server' => '',
+                'port' => 443,
+                'encryption' => '',
+                'username' => '',
+                'password' => '',
+                'apiKey' => '',
+                'apiEndpoint' => 'https://email.us-east-1.amazonaws.com',
+                'description' => 'Sends over the Amazon SES v2 API (HTTPS), signed with AWS SigV4. Needs an Access Key ID and Secret Access Key with ses:SendEmail.',
+                'helpLink' => 'https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_SendEmail.html',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+            'other' => array(
+                'name' => 'other',
+                'type' => self::TYPE_SMTP,
+                'server' => '',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => '',
+                'password' => '',
+                'description' => 'Enter your custom SMTP server details.',
+                'helpLink' => '',
+                'authRequired' => 1,
+                'configured' => 0,
+            ),
+        );
+    }
+
+    /**
+     * SMTP presets whose host varies by region, so the admin must be able to
+     * edit the server field even though the provider is not "other".
+     *
+     * @param object|string $provider Provider row or name.
+     * @return bool
+     */
+    public static function has_editable_server($provider)
+    {
+        $name = is_object($provider) ? $provider->name : (string) $provider;
+
+        return in_array($name, array('other', 'ses'), true);
+    }
+
+    /**
+     * Insert any built-in provider that is not in the table yet.
+     *
+     * Runs on every schema upgrade, not just on a fresh install, so presets
+     * added in later releases reach sites that already have a providers table.
+     * Existing rows are never touched, so configured credentials stay put.
+     */
+    private static function seed_missing_providers()
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'intellisend_providers';
+
+        $existing = $wpdb->get_col("SELECT name FROM $table");
+        $existing = is_array($existing) ? $existing : array();
+
+        foreach (self::get_default_providers() as $name => $provider) {
+            if (in_array($name, $existing, true)) {
+                continue;
+            }
+
+            $wpdb->insert($table, $provider);
+        }
     }
 
     /**
@@ -402,6 +617,11 @@ class IntelliSend_Database
             if (isset($args['authRequired'])) {
                 $query .= $wpdb->prepare(" AND authRequired = %d", absint($args['authRequired']));
             }
+
+            // Filter by transport type ('smtp' or 'api')
+            if (isset($args['type'])) {
+                $query .= $wpdb->prepare(" AND type = %s", sanitize_text_field($args['type']));
+            }
         }
 
         // Add ordering
@@ -437,8 +657,144 @@ class IntelliSend_Database
     }
 
     /**
+     * Get the transport type for a provider row.
+     *
+     * @param object $provider Provider object.
+     * @return string 'smtp' or 'api'
+     */
+    public static function get_provider_type($provider)
+    {
+        if (! $provider) {
+            return self::TYPE_SMTP;
+        }
+
+        $type = isset($provider->type) ? strtolower(trim($provider->type)) : '';
+
+        return self::TYPE_API === $type ? self::TYPE_API : self::TYPE_SMTP;
+    }
+
+    /**
+     * Whether a provider sends over an HTTP API instead of SMTP.
+     *
+     * @param object $provider Provider object.
+     * @return bool
+     */
+    public static function is_api_provider($provider)
+    {
+        return self::TYPE_API === self::get_provider_type($provider);
+    }
+
+    /**
+     * Human readable label for a provider, used across the admin UI.
+     *
+     * @param object|string $provider Provider object or provider name.
+     * @return string
+     */
+    public static function get_provider_label($provider)
+    {
+        $name = is_object($provider) ? $provider->name : (string) $provider;
+
+        // API transports name themselves, so the label never drifts from the class.
+        if (class_exists('IntelliSend_Api_Transport')) {
+            $transport = IntelliSend_Api_Transport::for_provider($name);
+
+            if ($transport) {
+                return $transport::get_label();
+            }
+        }
+
+        $labels = array(
+            'sendgrid'  => 'SendGrid (SMTP)',
+            'brevo'     => 'Brevo (SMTP)',
+            'ses'       => 'Amazon SES (SMTP)',
+            'mailchimp' => 'Mailchimp / Mandrill',
+            'other'     => 'Other (Custom SMTP)',
+        );
+
+        if (isset($labels[$name])) {
+            return $labels[$name];
+        }
+
+        return ucfirst($name);
+    }
+
+    /**
+     * Get the decrypted API key for a provider.
+     *
+     * @param object $provider Provider object.
+     * @return string
+     */
+    public static function get_provider_api_key($provider)
+    {
+        if (! $provider || empty($provider->apiKey)) {
+            return '';
+        }
+
+        return self::decrypt_data($provider->apiKey);
+    }
+
+    /**
+     * Decide whether a provider has everything it needs to send.
+     *
+     * @param array       $data     Incoming provider data.
+     * @param object|null $existing Existing provider row, for partial updates.
+     * @return int 1 when configured, 0 otherwise.
+     */
+    private static function evaluate_configured($data, $existing = null)
+    {
+        $value = function ($key) use ($data, $existing) {
+            if (array_key_exists($key, $data) && null !== $data[$key]) {
+                return $data[$key];
+            }
+
+            return ($existing && isset($existing->$key)) ? $existing->$key : '';
+        };
+
+        $type = isset($data['type']) ? strtolower(trim($data['type'])) : self::get_provider_type($existing);
+
+        if (self::TYPE_API === $type) {
+            // API transports need a secret and a verified sender address. The
+            // secret may also come from the transport's constant or environment
+            // variable, and some vendors need a second, non-secret credential.
+            $has_key = ! empty($value('apiKey'));
+            $has_identity = true;
+
+            if (class_exists('IntelliSend_Api_Transport')) {
+                $name = isset($data['name']) ? $data['name'] : ($existing ? $existing->name : '');
+                $transport = IntelliSend_Api_Transport::for_provider($name);
+
+                if ($transport) {
+                    if (! $has_key && '' !== $transport::get_environment_key()) {
+                        $has_key = true;
+                    }
+
+                    if ($transport::requires_identity()) {
+                        // get_identity() already falls back to the constant and
+                        // the environment variable.
+                        $has_identity = ! empty($value('username')) || '' !== $transport::get_identity($existing);
+                    }
+                }
+            }
+
+            return ($has_key && $has_identity && ! empty($value('sender'))) ? 1 : 0;
+        }
+
+        if (empty($value('server')) || empty($value('port'))) {
+            return 0;
+        }
+
+        $auth_required = $value('authRequired');
+
+        if (! $auth_required) {
+            return 1;
+        }
+
+        return (! empty($value('username')) && ! empty($value('password'))) ? 1 : 0;
+    }
+
+    /**
      * Add a new provider and handle first provider logic
-     * 
+     *
      * @param array $data Provider data
      * @return int|bool Provider ID on success, false on failure
      */
@@ -464,37 +820,34 @@ class IntelliSend_Database
             "SELECT COUNT(*) FROM $table WHERE configured = 1"
         );
 
-        // Determine if the provider is configured
-        $configured = 0;
-        if (!empty($data['server']) && !empty($data['port'])) {
-            // For providers that require authentication, also check username and password
-            if (isset($data['authRequired']) && $data['authRequired']) {
-                if (!empty($data['username']) && !empty($data['password'])) {
-                    $configured = 1;
-                }
-            } else {
-                // For providers that don't require auth, just having server and port is enough
-                $configured = 1;
-            }
-        }
+        // Normalize the transport type
+        $type = isset($data['type']) && self::TYPE_API === strtolower(trim($data['type'])) ? self::TYPE_API : self::TYPE_SMTP;
+        $data['type'] = $type;
 
-        // Encrypt password if provided
+        // Determine if the provider is configured
+        $configured = self::evaluate_configured($data);
+
+        // Encrypt secrets if provided
         $password = !empty($data['password']) ? self::encrypt_data($data['password']) : '';
+        $api_key  = !empty($data['apiKey']) ? self::encrypt_data($data['apiKey']) : '';
 
         // Insert the provider
         $result = $wpdb->insert(
             $table,
             array(
                 'name' => sanitize_text_field($data['name']),
+                'type' => $type,
                 'description' => isset($data['description']) ? sanitize_text_field($data['description']) : '',
                 'helpLink' => isset($data['helpLink']) ? sanitize_text_field($data['helpLink']) : '',
-                'server' => sanitize_text_field($data['server']),
-                'port' => sanitize_text_field($data['port']),
+                'server' => isset($data['server']) ? sanitize_text_field($data['server']) : '',
+                'port' => isset($data['port']) ? sanitize_text_field($data['port']) : '',
                 'encryption' => isset($data['encryption']) ? sanitize_text_field($data['encryption']) : 'tls',
-                'authRequired' => absint($data['authRequired']),
-                'username' => sanitize_text_field($data['username']),
-                'sender' => isset($data['sender']) && !empty($data['sender']) ? sanitize_text_field($data['sender']) : sanitize_text_field($data['username']),
+                'authRequired' => isset($data['authRequired']) ? absint($data['authRequired']) : 1,
+                'username' => isset($data['username']) ? sanitize_text_field($data['username']) : '',
+                'sender' => isset($data['sender']) && !empty($data['sender']) ? sanitize_text_field($data['sender']) : (isset($data['username']) ? sanitize_text_field($data['username']) : ''),
                 'password' => $password,
+                'apiKey' => $api_key,
+                'apiEndpoint' => isset($data['apiEndpoint']) ? esc_url_raw($data['apiEndpoint']) : '',
                 'configured' => $configured,
             )
         );
@@ -557,10 +910,16 @@ class IntelliSend_Database
         global $wpdb;
         $table = $wpdb->prefix . 'intellisend_providers';
 
+        $existing = self::get_provider($id);
+
         $update_data = array();
 
         if (isset($data['name'])) {
             $update_data['name'] = sanitize_text_field($data['name']);
+        }
+
+        if (isset($data['type'])) {
+            $update_data['type'] = self::TYPE_API === strtolower(trim($data['type'])) ? self::TYPE_API : self::TYPE_SMTP;
         }
 
         if (isset($data['description'])) {
@@ -602,39 +961,18 @@ class IntelliSend_Database
             $update_data['password'] = self::encrypt_data($data['password']);
         }
 
-        // Set configured to true if server and port are provided
-        if (!empty($data['server']) && !empty($data['port'])) {
-            // Get current provider data to check authRequired if not in the update data
-            $authRequired = isset($data['authRequired']) ? $data['authRequired'] : null;
-
-            if ($authRequired === null) {
-                $provider = self::get_provider($id);
-                $authRequired = $provider ? $provider->authRequired : 0;
-            }
-
-            // For providers that require authentication, also check username and password
-            if ($authRequired) {
-                $username = isset($data['username']) ? $data['username'] : null;
-                $password = isset($data['password']) ? $data['password'] : null;
-
-                if ($username === null || $password === null) {
-                    $provider = $provider ?? self::get_provider($id);
-                    $username = $username ?? ($provider ? $provider->username : '');
-                    $password = $password ?? ($provider ? $provider->password : '');
-                }
-
-                if (!empty($username) && !empty($password)) {
-                    $update_data['configured'] = 1;
-                } else {
-                    $update_data['configured'] = 0;
-                }
-            } else {
-                // For providers that don't require auth, just having server and port is enough
-                $update_data['configured'] = 1;
-            }
-        } else {
-            $update_data['configured'] = 0;
+        if (isset($data['apiKey'])) {
+            $update_data['apiKey'] = self::encrypt_data($data['apiKey']);
         }
+
+        if (isset($data['apiEndpoint'])) {
+            $update_data['apiEndpoint'] = esc_url_raw($data['apiEndpoint']);
+        }
+
+        // Recompute the configured flag from the merged (incoming + stored) values,
+        // so a partial update never clears it. evaluate_configured() picks the SMTP
+        // or API rules based on the resulting transport type.
+        $update_data['configured'] = self::evaluate_configured($data, $existing);
 
         $result = $wpdb->update(
             $table,
@@ -734,7 +1072,7 @@ class IntelliSend_Database
                 array(
                     'defaultProviderName' => isset($data['defaultProviderName']) ? sanitize_text_field($data['defaultProviderName']) : 'other',
                     'antiSpamEndPoint' => isset($data['antiSpamEndPoint']) ? sanitize_text_field($data['antiSpamEndPoint']) : '',
-                    'antiSpamApiKey' => isset($data['antiSpamApiKey']) ? self::encrypt_data(sanitize_text_field($data['antiSpamApiKey'])) : '',
+                    'antiSpamApiKey' => isset($data['antiSpamApiKey']) && is_string($data['antiSpamApiKey']) ? self::encrypt_data($data['antiSpamApiKey']) : '',
                     'testRecipient' => isset($data['testRecipient']) ? sanitize_email($data['testRecipient']) : '',
                     'spamTestMessage' => isset($data['spamTestMessage']) ? sanitize_textarea_field($data['spamTestMessage']) : '',
                     'logsRetentionDays' => isset($data['logsRetentionDays']) ? absint($data['logsRetentionDays']) : 365,
@@ -755,8 +1093,8 @@ class IntelliSend_Database
                 $update_data['antiSpamEndPoint'] = sanitize_text_field($data['antiSpamEndPoint']);
             }
 
-            if (isset($data['antiSpamApiKey'])) {
-                $update_data['antiSpamApiKey'] = self::encrypt_data(sanitize_text_field($data['antiSpamApiKey']));
+            if (isset($data['antiSpamApiKey']) && is_string($data['antiSpamApiKey'])) {
+                $update_data['antiSpamApiKey'] = self::encrypt_data($data['antiSpamApiKey']);
             }
 
             if (isset($data['testRecipient'])) {
@@ -1050,20 +1388,45 @@ class IntelliSend_Database
             'page' => 1,
             'orderby' => 'date',
             'order' => 'DESC',
+        );
+
+        $args = wp_parse_args($args, $defaults);
+        $limit = max(1, absint($args['per_page']));
+        $offset = (max(1, (int) $args['page']) - 1) * $limit;
+        list($where_clause, $values) = self::get_report_filter_sql($args);
+
+        $columns = array('id', 'date', 'subject', 'sender', 'recipients', 'message', 'status', 'log', 'antiSpamEnabled', 'isSpam', 'routingRuleId', 'providerName');
+        $orderby = in_array($args['orderby'], $columns, true) ? $args['orderby'] : 'date';
+        $order = is_string($args['order']) && strtoupper($args['order']) === 'ASC' ? 'ASC' : 'DESC';
+        // Mail can share a timestamp; the ID keeps pagination deterministic.
+        $sort = "$orderby $order" . ($orderby === 'id' ? '' : ", id $order");
+        $values[] = $limit;
+        $values[] = $offset;
+        $query = "SELECT * FROM $table $where_clause ORDER BY $sort LIMIT %d OFFSET %d";
+
+        return $wpdb->get_results($wpdb->prepare($query, $values));
+    }
+
+    /**
+     * Build one set of predicates for report rows and both count entry points.
+     * Both historical isSpam and current is_spam arguments remain supported.
+     *
+     * @param array $args Report filters.
+     * @return array SQL fragment and its parameter values.
+     */
+    private static function get_report_filter_sql($args)
+    {
+        global $wpdb;
+        $args = wp_parse_args($args, array(
             'status' => '',
             'is_spam' => null,
+            'isSpam' => '',
             'providerName' => '',
             'routingRuleId' => '',
             'date_from' => '',
             'date_to' => '',
             'search' => '',
-        );
-
-        $args = wp_parse_args($args, $defaults);
-
-        $limit = absint($args['per_page']);
-        $offset = ($args['page'] - 1) * $limit;
-
+        ));
         $where = array();
         $where_format = array();
 
@@ -1074,9 +1437,10 @@ class IntelliSend_Database
         }
 
         // Is spam filter
-        if ($args['is_spam'] !== null) {
+        $is_spam = $args['is_spam'] !== null ? $args['is_spam'] : $args['isSpam'];
+        if ($is_spam !== '' && $is_spam !== null) {
             $where[] = 'isSpam = %d';
-            $where_format[] = absint($args['is_spam']);
+            $where_format[] = absint($is_spam);
         }
 
         // Provider filter
@@ -1105,27 +1469,14 @@ class IntelliSend_Database
         // Search filter
         if (!empty($args['search'])) {
             $search_term = '%' . $wpdb->esc_like($args['search']) . '%';
-            $where[] = '(subject LIKE %s OR sender LIKE %s OR recipient LIKE %s)';
+            $where[] = '(subject LIKE %s OR sender LIKE %s OR recipients LIKE %s OR message LIKE %s)';
+            $where_format[] = $search_term;
             $where_format[] = $search_term;
             $where_format[] = $search_term;
             $where_format[] = $search_term;
         }
 
-        $where_clause = '';
-        if (!empty($where)) {
-            $where_clause = 'WHERE ' . implode(' AND ', $where);
-            $where_clause = $wpdb->prepare($where_clause, $where_format);
-        }
-
-        $orderby = sanitize_sql_orderby($args['orderby'] . ' ' . $args['order']);
-        if (!$orderby) {
-            $orderby = 'date DESC';
-        }
-
-        $query = "SELECT * FROM $table $where_clause ORDER BY $orderby LIMIT %d OFFSET %d";
-        $prepared_query = $wpdb->prepare($query, $limit, $offset);
-
-        return $wpdb->get_results($prepared_query);
+        return array(empty($where) ? '' : 'WHERE ' . implode(' AND ', $where), $where_format);
     }
 
     /**
@@ -1138,51 +1489,9 @@ class IntelliSend_Database
     {
         global $wpdb;
         $table = $wpdb->prefix . 'intellisend_reports';
-
-        // Default arguments
-        $defaults = array(
-            'status' => '',
-            'isSpam' => '',
-            'date_from' => '',
-            'date_to' => '',
-            'search' => '',
-        );
-
-        $args = wp_parse_args($args, $defaults);
-
-        // Start building the query
-        $query = "SELECT COUNT(*) FROM $table WHERE 1=1";
-
-        // Add filters
-        if (!empty($args['status'])) {
-            $query .= $wpdb->prepare(" AND status = %s", $args['status']);
-        }
-
-        if ($args['isSpam'] !== '') {
-            $query .= $wpdb->prepare(" AND isSpam = %d", absint($args['isSpam']));
-        }
-
-        if (!empty($args['date_from'])) {
-            $query .= $wpdb->prepare(" AND date >= %s", $args['date_from'] . ' 00:00:00');
-        }
-
-        if (!empty($args['date_to'])) {
-            $query .= $wpdb->prepare(" AND date <= %s", $args['date_to'] . ' 23:59:59');
-        }
-
-        if (!empty($args['search'])) {
-            $search = '%' . $wpdb->esc_like($args['search']) . '%';
-            $query .= $wpdb->prepare(
-                " AND (subject LIKE %s OR sender LIKE %s OR recipients LIKE %s OR message LIKE %s)",
-                $search,
-                $search,
-                $search,
-                $search
-            );
-        }
-
-        // Execute the query
-        return (int) $wpdb->get_var($query);
+        list($where_clause, $values) = self::get_report_filter_sql($args);
+        $query = "SELECT COUNT(*) FROM $table $where_clause";
+        return (int) $wpdb->get_var(empty($values) ? $query : $wpdb->prepare($query, $values));
     }
 
     /**
@@ -1334,52 +1643,6 @@ class IntelliSend_Database
      */
     public static function count_reports($args = array())
     {
-        global $wpdb;
-        $table = $wpdb->prefix . 'intellisend_reports';
-
-        // Default arguments
-        $defaults = array(
-            'status' => '',
-            'isSpam' => '',
-            'date_from' => '',
-            'date_to' => '',
-            'search' => '',
-        );
-
-        $args = wp_parse_args($args, $defaults);
-
-        // Start building the query
-        $query = "SELECT COUNT(*) FROM $table WHERE 1=1";
-
-        // Add filters
-        if (!empty($args['status'])) {
-            $query .= $wpdb->prepare(" AND status = %s", $args['status']);
-        }
-
-        if ($args['isSpam'] !== '') {
-            $query .= $wpdb->prepare(" AND isSpam = %d", absint($args['isSpam']));
-        }
-
-        if (!empty($args['date_from'])) {
-            $query .= $wpdb->prepare(" AND date >= %s", $args['date_from'] . ' 00:00:00');
-        }
-
-        if (!empty($args['date_to'])) {
-            $query .= $wpdb->prepare(" AND date <= %s", $args['date_to'] . ' 23:59:59');
-        }
-
-        if (!empty($args['search'])) {
-            $search = '%' . $wpdb->esc_like($args['search']) . '%';
-            $query .= $wpdb->prepare(
-                " AND (subject LIKE %s OR sender LIKE %s OR recipients LIKE %s OR message LIKE %s)",
-                $search,
-                $search,
-                $search,
-                $search
-            );
-        }
-
-        // Execute the query
-        return (int) $wpdb->get_var($query);
+        return self::get_reports_count($args);
     }
 }

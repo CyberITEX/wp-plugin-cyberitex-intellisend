@@ -53,6 +53,16 @@
                 e.stopPropagation();
             });
             
+            // Keep Tab within the visible dialog; Escape uses the existing close handler.
+            $(document).on('keydown', '#view-report-modal', function(e) {
+                if (e.key !== 'Tab') return;
+                const $focusable = $(this).find('button, [href], input, select, textarea, iframe, [tabindex]:not([tabindex="-1"])').filter(':visible').not(':disabled');
+                const first = $focusable[0];
+                const last = $focusable[$focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            });
+
             // Filter form reset
             $(document).on('click', '#reset-filters', function(e) {
                 e.preventDefault();
@@ -139,6 +149,13 @@
         setupSortableColumns: function() {
             const self = this;
             
+            $('.intellisend-table th.sortable').each(function() {
+                const $header = $(this);
+                const params = new URLSearchParams(window.location.search);
+                $header.attr('aria-sort', params.get('orderby') === $header.data('sort') ? (params.get('order') === 'asc' ? 'ascending' : 'descending') : 'none');
+                $header.wrapInner('<button type="button" class="sort-column"></button>');
+            });
+
             // Handle sortable column clicks
             $(document).on('click', '.intellisend-table th.sortable', function() {
                 const column = $(this).data('sort');
@@ -347,12 +364,11 @@
          */
         viewReport: function(reportId) {
             const self = this;
-            
-            console.log('Opening modal for report ID:', reportId);
-            
+
             // Show loading state in modal
-            $('#view-report-modal').addClass('loading');
-            $('#view-report-modal').show();
+            this.modalTrigger = document.activeElement;
+            $('#view-report-modal').addClass('loading').attr('aria-busy', 'true');
+            $('#view-report-modal').show().find('.intellisend-modal-close').trigger('focus');
             
             // Get report data via AJAX
             $.ajax({
@@ -364,23 +380,21 @@
                     nonce: intellisendData.nonce
                 },
                 success: function(response) {
-                    console.log('AJAX response:', response);
-                    $('#view-report-modal').removeClass('loading');
+
+                    $('#view-report-modal').removeClass('loading').attr('aria-busy', 'false');
                     
                     if (response.success) {
-                        console.log('Report data:', response.data);
+
                         self.populateReportModal(response.data);
                     } else {
-                        console.error('Error response:', response);
+
                         self.showNotification('error', response.data && response.data.message ? response.data.message : 'Failed to load report details.');
                         self.closeModal($('#view-report-modal'));
                     }
                 },
                 error: function(xhr, status, error) {
-                    $('#view-report-modal').removeClass('loading');
-                    console.error('AJAX error:', error);
-                    console.error('Status:', status);
-                    console.error('Response:', xhr.responseText);
+                    $('#view-report-modal').removeClass('loading').attr('aria-busy', 'false');
+
                     self.showNotification('error', 'A network error occurred while loading the report.');
                     self.closeModal($('#view-report-modal'));
                 }
@@ -392,8 +406,7 @@
          */
         populateReportModal: function(report) {
             try {
-                console.log('Populating modal with data:', report);
-                
+
                 // Fill the modal with report data
                 $('#report-date').text(this.formatDate(report.date) || 'N/A');
                 $('#report-status').html(this.getStatusBadgeHtml(report.status || 'unknown'));
@@ -404,14 +417,13 @@
                 $('#report-subject').text(report.subject || 'N/A');
                 
                 // Format message with syntax highlighting if possible
-                const messageHtml = report.message ? report.message.replace(/\n/g, '<br>') : 'No message content available';
-                $('#report-message').html(messageHtml);
+                this.renderMessagePreview(report.message);
                 
                 // Headers
-                $('#report-headers').text(report.log || 'No headers available');
+                $('#report-headers').text(report.log || 'No log details available');
                 
                 // Show/hide spam section
-                if (report.isSpam) {
+                if (Number(report.isSpam) === 1) {
                     $('#report-spam-section').show();
                     $('#report-spam-score').text(report.spamScore || 'N/A');
                 } else {
@@ -419,16 +431,15 @@
                 }
                 
                 // Show/hide error section
-                if (report.status === 'error') {
+                if (report.status === 'failed' || report.status === 'error') {
                     $('#report-error-section').show();
-                    $('#report-error-message').text(report.errorMessage || 'Unknown error');
+                    $('#report-error-message').text(report.errorMessage || report.log || 'No additional error details were recorded.');
                 } else {
                     $('#report-error-section').hide();
                 }
-                
-                console.log('Modal populated successfully');
+
             } catch (error) {
-                console.error('Error populating modal:', error);
+
                 this.showNotification('error', 'Error displaying report details');
             }
         },
@@ -436,15 +447,48 @@
         /**
          * Format date for display
          */
+        renderMessagePreview: function(message) {
+            const $container = $('#report-message').empty();
+            if (!message) { $container.text('No message content available'); return; }
+            // Preserve email formatting in an isolated preview, with remote resources disabled.
+            const parsed = new DOMParser().parseFromString(String(message), 'text/html');
+            parsed.querySelectorAll('script, iframe, frame, object, embed, base, meta, link, form').forEach(node => node.remove());
+            parsed.querySelectorAll('*').forEach(node => {
+                Array.from(node.attributes).forEach(attribute => {
+                    const name = attribute.name.toLowerCase();
+                    if (name.startsWith('on') || ['href', 'srcset', 'srcdoc', 'action', 'formaction', 'target', 'ping'].includes(name) || (name === 'src' && !/^data:image\/(?:png|gif|jpeg|webp);/i.test(attribute.value))) node.removeAttribute(attribute.name);
+                });
+            });
+            const preview = document.createElement('iframe');
+            preview.className = 'report-message-preview';
+            preview.title = 'Email message preview';
+            // Same-origin access lets the parent size the preview and handle keyboard focus.
+            // Scripts, forms, popups and navigation out of the frame remain sandboxed.
+            preview.setAttribute('sandbox', 'allow-same-origin');
+            preview.setAttribute('referrerpolicy', 'no-referrer');
+            preview.setAttribute('tabindex', '0');
+            preview.addEventListener('load', () => {
+                const content = preview.contentDocument;
+                if (!content) return;
+                preview.style.height = Math.max(120, Math.min(content.body.scrollHeight + 24, 640)) + 'px';
+                content.addEventListener('keydown', event => {
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        this.closeModal($('#view-report-modal'));
+                    } else if (event.key === 'Tab') {
+                        event.preventDefault();
+                        $('#view-report-modal .intellisend-modal-close').trigger('focus');
+                    }
+                });
+            });
+            preview.srcdoc = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:"><style>body{font:14px/1.5 sans-serif;overflow-wrap:anywhere;white-space:pre-wrap}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>' + parsed.body.innerHTML + '</body></html>';
+            $container.append(preview).append($('<p class="description"></p>').text('Remote images and links are disabled in this preview.'));
+        },
+
         formatDate: function(dateString) {
-            if (!dateString) return 'N/A';
-            
-            try {
-                const date = new Date(dateString);
-                return date.toLocaleString();
-            } catch (e) {
-                return dateString;
-            }
+            // WordPress stores site-local wall-clock time without a timezone offset.
+            // Preserve it instead of interpreting it in the administrator's timezone.
+            return dateString || '';
         },
         
         /**
@@ -454,7 +498,7 @@
             if (!status) return 'N/A';
             
             let label = status.charAt(0).toUpperCase() + status.slice(1);
-            return '<span class="status-badge status-' + status + '">' + label + '</span>';
+            return $('<span class="status-badge"></span>').addClass('status-' + String(status).replace(/[^a-z-]/gi, '')).text(label).prop('outerHTML');
         },
         
         /**
@@ -462,11 +506,12 @@
          */
         closeModal: function($modal) {
             if (!$modal) {
-                console.error('Modal not found');
+
                 return;
             }
-            console.log('Closing modal:', $modal.attr('id'));
-            $modal.hide();
+
+            $modal.hide().attr('aria-busy', 'false');
+            if (this.modalTrigger && document.contains(this.modalTrigger)) this.modalTrigger.focus();
         },
         
         /**
@@ -513,11 +558,13 @@
             const noticeHtml = `
                 <div class="intellisend-notice ${type}">
                     <span class="intellisend-notice-icon dashicons ${icon}"></span>
-                    <div class="intellisend-notice-content">${message}</div>
+                    <div class="intellisend-notice-content"></div>
                 </div>
             `;
             
-            $('.intellisend-admin h1').after(noticeHtml);
+            const $notice = $(noticeHtml).attr('role', type === 'error' ? 'alert' : 'status');
+            $notice.find('.intellisend-notice-content').text(message);
+            $('.intellisend-admin h1').after($notice);
             
             // Auto dismiss after 5 seconds
             setTimeout(function() {

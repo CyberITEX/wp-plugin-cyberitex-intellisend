@@ -50,6 +50,7 @@ class IntelliSend {
      * Include the following files that make up the plugin:
      *
      * - IntelliSend_Admin. Defines all hooks for the admin area.
+     * - IntelliSend_Api_Transport and its subclasses. HTTP mail transports.
      * - IntelliSend_Form. Defines all hooks for email interception and processing.
      *
      * @since    1.0.0
@@ -58,6 +59,10 @@ class IntelliSend {
     private function load_dependencies() {
         // Core plugin functionality
         require_once INTELLISEND_PLUGIN_DIR . 'includes/class-database.php';
+        require_once INTELLISEND_PLUGIN_DIR . 'includes/class-api-transport.php';
+        require_once INTELLISEND_PLUGIN_DIR . 'includes/class-sendgrid.php';
+        require_once INTELLISEND_PLUGIN_DIR . 'includes/class-brevo.php';
+        require_once INTELLISEND_PLUGIN_DIR . 'includes/class-ses.php';
         require_once INTELLISEND_PLUGIN_DIR . 'includes/class-form.php';
         require_once INTELLISEND_PLUGIN_DIR . 'includes/class-spamcheck.php';
 
@@ -77,6 +82,9 @@ class IntelliSend {
      */
     private function define_admin_hooks() {
         if ( is_admin() ) {
+            // Apply pending schema upgrades for installs updated in place.
+            add_action( 'admin_init', array( 'IntelliSend_Database', 'maybe_upgrade' ), 5 );
+
             $this->admin = new IntelliSend_Admin();
         }
     }

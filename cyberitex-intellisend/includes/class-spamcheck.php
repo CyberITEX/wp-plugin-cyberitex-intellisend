@@ -22,16 +22,19 @@ final class IntelliSend_SpamCheck {
      * @param string $api_key_override Optional. If provided, this key will be used instead of the one from the database.
      * @return array Array with spam check results
      */
-    public function check($message, $api_key_override = '') {
+    public function check($message, $api_key_override = '', $endpoint_override = '') {
         // Get settings
         $settings = IntelliSend_Database::get_settings();
         
         // Use provided API key or get from settings
         $api_key = $api_key_override;
         if (empty($api_key)) {
-            $api_key = $settings->antiSpamApiKey;
+            $api_key = !empty($settings->antiSpamApiKey) ? $settings->antiSpamApiKey : '';
         }
         
+        if (!is_string($api_key) || preg_match('/[\r\n]/', $api_key)) {
+            return array('success' => false, 'message' => 'Invalid API key format', 'isSpam' => false);
+        }
         if ( empty( $api_key ) ) {
             return array(
                 'success' => false,
@@ -41,14 +44,14 @@ final class IntelliSend_SpamCheck {
         }
         
         // Prepare the API request
-        $api_url = !empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/tools/SpamCheck';
+        $api_url = !empty($endpoint_override) ? $endpoint_override : (!empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/tools/SpamCheck');
         
         $args = array(
             'method'  => 'POST',
             'timeout' => 30,
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'X-API-Key'    => sanitize_text_field( $api_key ),
+                'X-API-Key'    => $api_key,
             ),
             'body'    => json_encode( array(
                 'message' => $message,
@@ -98,11 +101,20 @@ final class IntelliSend_SpamCheck {
             );
         }
         
+        $is_spam = is_scalar($data['isSpam']) ? filter_var($data['isSpam'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : null;
+        if (null === $is_spam) {
+            return array(
+                'success' => false,
+                'message' => 'Invalid spam verdict from spam check API',
+                'isSpam' => false,
+            );
+        }
+
         // Return the spam check results
         return array(
             'success' => true,
             'message' => 'Spam check completed successfully',
-            'isSpam'  => (bool) $data['isSpam'],
+            'isSpam'  => $is_spam,
             'score'   => isset( $data['score'] ) ? floatval( $data['score'] ) : 0,
         );
     }
@@ -123,9 +135,12 @@ final class IntelliSend_SpamCheck {
         if (!empty($api_key_override)) {
             $api_key = $api_key_override;
         } else {
-            $api_key = $settings->antiSpamApiKey;
+            $api_key = !empty($settings->antiSpamApiKey) ? $settings->antiSpamApiKey : '';
         }
         
+        if (!is_string($api_key) || preg_match('/[\r\n]/', $api_key)) {
+            return array('success' => false, 'message' => 'Invalid API key format');
+        }
         if (empty($api_key)) {
             return array(
                 'success' => false,
@@ -141,7 +156,7 @@ final class IntelliSend_SpamCheck {
             'timeout' => 15,
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'X-API-Key'    => sanitize_text_field( $api_key ),
+                'X-API-Key'    => $api_key,
             ),
             'body'    => json_encode( array(
                 'validate' => true,
@@ -170,10 +185,21 @@ final class IntelliSend_SpamCheck {
             );
         }
         
+        $status_code = (int) wp_remote_retrieve_response_code($response);
+        if (200 !== $status_code) {
+            return array(
+                'success' => false,
+                'message' => 'API key validation failed with status code: ' . $status_code,
+            );
+        }
+        $valid = isset($data['valid']) && is_scalar($data['valid'])
+            ? filter_var($data['valid'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+            : false;
+
         // Return the validation results
         return array(
-            'success' => isset($data['valid']) ? $data['valid'] : false,
-            'message' => isset($data['message']) ? $data['message'] : 'API key validation failed',
+            'success' => true === $valid,
+            'message' => isset($data['message']) && is_string($data['message']) ? $data['message'] : 'API key validation failed',
         );
     }
 }

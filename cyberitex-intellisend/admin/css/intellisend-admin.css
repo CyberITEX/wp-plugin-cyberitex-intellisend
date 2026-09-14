@@ -669,3 +669,53 @@
         max-width: none;
     }
 }
+
+/* Shared keyboard and narrow-screen refinements retain the existing admin palette. */
+.intellisend-admin button:focus-visible,
+.intellisend-settings-wrap button:focus-visible,
+.intellisend-providers-wrap button:focus-visible,
+.intellisend-routes-wrap button:focus-visible,
+.intellisend-toast button:focus-visible,
+.intellisend-modal button:focus-visible {
+    outline: 2px solid #2271b1;
+    outline-offset: 3px;
+}
+.section-toggle-button,
+.intellisend-table .sort-column {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.section-toggle-button { display: flex; align-items: center; gap: 8px; }
+.section-toggle-button .section-toggle-indicator { margin-left: auto; }
+.recipient-tag .remove-recipient,
+.intellisend-toast .toast-close,
+.intellisend-toast-close {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+.recipient-tag .remove-recipient { padding: 0 4px; min-width: 24px; min-height: 24px; }
+.report-message-preview { display: block; width: 100%; height: 320px; border: 0; background: #fff; }
+.intellisend-modal-content { max-height: calc(100vh - 64px); }
+.intellisend-notification { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+    .intellisend-notification { max-width: calc(100vw - 40px); box-sizing: border-box; }
+    .provider-test-send .input-with-button, .intellisend-settings-wrap .input-with-button { flex-wrap: wrap; }
+    .provider-test-send input, .intellisend-settings-field input { max-width: 100%; min-width: 0; }
+    .intellisend-modal-content { width: calc(100% - 24px); margin: 12px auto; max-height: calc(100vh - 24px); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .intellisend-admin *, .intellisend-settings-wrap *, .intellisend-providers-wrap *, .intellisend-toast * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

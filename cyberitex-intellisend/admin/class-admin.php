@@ -243,6 +243,18 @@ class IntelliSend_Admin
                     INTELLISEND_VERSION,
                     false
                 );
+
+                // Describe each API transport so the page can render its own
+                // key placeholder, region choices and hints.
+                wp_localize_script(
+                    'intellisend-providers-script',
+                    'intellisendProviders',
+                    array(
+                        'transports' => class_exists('IntelliSend_Api_Transport')
+                            ? IntelliSend_Api_Transport::describe_all()
+                            : array(),
+                    )
+                );
             } elseif ($hook === 'intellisend_page_intellisend-routing') {
                 wp_enqueue_style(
                     'intellisend-routes-style',

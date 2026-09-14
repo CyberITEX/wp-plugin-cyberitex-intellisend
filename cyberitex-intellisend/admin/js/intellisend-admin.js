@@ -110,11 +110,13 @@
         function showNotice(type, message) {
             var toast = $('<div class="intellisend-toast intellisend-toast-' + type + '">' +
                          '<div class="intellisend-toast-icon"></div>' +
-                         '<div class="intellisend-toast-content">' + message + '</div>' +
-                         '<div class="intellisend-toast-close">&times;</div>' +
+                         '<div class="intellisend-toast-content"></div>' +
+                         '<button type="button" class="intellisend-toast-close" aria-label="Dismiss notification">&times;</button>' +
                          '</div>');
             
-            // Add to container
+            toast.attr('role', type === 'error' ? 'alert' : 'status').find('.intellisend-toast-content').text(message);
+
+        // Add to container
             $('.intellisend-toast-container').append(toast);
             
             // Animate in
@@ -344,14 +346,14 @@
         });
         
         // Close modal when clicking the X
-        $('.intellisend-modal-close').on('click', function() {
-            $('.intellisend-modal').hide();
+        $('#intellisend-email-modal .intellisend-modal-close').on('click', function() {
+            $('#intellisend-email-modal').hide();
         });
         
         // Close modal when clicking outside of it
         $(window).on('click', function(e) {
             if ($(e.target).hasClass('intellisend-modal')) {
-                $('.intellisend-modal').hide();
+                $('#intellisend-email-modal').hide();
             }
         });
     });

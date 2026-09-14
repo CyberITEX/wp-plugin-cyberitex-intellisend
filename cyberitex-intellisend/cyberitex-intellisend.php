@@ -2,9 +2,11 @@
 /**
  * Plugin Name: IntelliSend
  * Description: Advanced email routing, spam protection, and email management with flexible SMTP configuration.
- * Version: 1.0.0
+ * Version: 1.2.1
  * Author: CyberITEX
  * Author URI: https://cyberitex.com/
+ * Requires at least: 5.7
+ * Requires PHP: 7.0
  * Text Domain: cyberitex-intellisend
  * Domain Path: /languages
  */
@@ -15,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 // Define plugin constants
-define( 'INTELLISEND_VERSION', '1.0.0' );
+define( 'INTELLISEND_VERSION', '1.2.1' );
 define( 'INTELLISEND_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'INTELLISEND_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -31,6 +33,10 @@ function intellisend_activate() {
     define( 'INTELLISEND_ACTIVATING', true );
     
     require_once INTELLISEND_PLUGIN_DIR . 'includes/class-database.php';
+    require_once INTELLISEND_PLUGIN_DIR . 'includes/class-api-transport.php';
+    require_once INTELLISEND_PLUGIN_DIR . 'includes/class-sendgrid.php';
+    require_once INTELLISEND_PLUGIN_DIR . 'includes/class-brevo.php';
+    require_once INTELLISEND_PLUGIN_DIR . 'includes/class-ses.php';
     require_once INTELLISEND_PLUGIN_DIR . 'includes/class-activator.php';
     
     // Create database tables first

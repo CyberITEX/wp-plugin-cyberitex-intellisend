@@ -83,8 +83,12 @@ class IntelliSend_Form
      */
     private static function setup_email_hooks()
     {
-        // Hook into WordPress mail system
+        // Hook into WordPress mail system.
+        // Order inside wp_mail(): the 'wp_mail' filter runs first (routing is
+        // resolved there), then 'pre_wp_mail', where an API provider can take
+        // over delivery entirely, then 'phpmailer_init' for the SMTP path.
         add_filter('wp_mail', array(__CLASS__, 'intercept_email'), 10, 1);
+        add_filter('pre_wp_mail', array(__CLASS__, 'maybe_send_via_api'), 10, 2);
         add_action('phpmailer_init', array(__CLASS__, 'configure_phpmailer'), 10, 1);
         add_action('wp_mail_succeeded', array(__CLASS__, 'log_email_success'), 10, 1);
         add_action('wp_mail_failed', array(__CLASS__, 'log_email_failure'), 10, 1);
@@ -191,6 +195,299 @@ class IntelliSend_Form
             error_log('Stack trace: ' . $e->getTraceAsString());
             return $args;
         }
+    }
+
+    /**
+     * Deliver the email through an HTTP API provider instead of PHPMailer.
+     *
+     * Hooked to 'pre_wp_mail', which runs after the 'wp_mail' filter has already
+     * resolved the routing rule, provider and spam verdict. Returning a boolean
+     * short-circuits wp_mail() so PHPMailer is never involved; returning the
+     * incoming value (null) lets the normal SMTP path continue.
+     *
+     * @param null|bool $short_circuit Current short-circuit value.
+     * @param array     $atts          wp_mail() arguments (to, subject, message, headers, attachments).
+     * @return null|bool
+     */
+    public static function maybe_send_via_api($short_circuit, $atts)
+    {
+        // Another plugin already took over this send.
+        if (null !== $short_circuit) {
+            return $short_circuit;
+        }
+
+        // Test emails are handled directly by the admin AJAX handler.
+        if (isset($GLOBALS['intellisend_test_email']) && $GLOBALS['intellisend_test_email']) {
+            return $short_circuit;
+        }
+
+        // Not our job unless the routed provider is an API transport.
+        if (!self::$current_provider || !IntelliSend_Database::is_api_provider(self::$current_provider)) {
+            return $short_circuit;
+        }
+
+        $provider = self::$current_provider;
+        $rule = self::$matched_rule;
+
+        self::debug_log("=== INTELLISEND API SEND START (provider: {$provider->name}) ===");
+
+        try {
+            if (!$provider->configured) {
+                self::debug_log("IntelliSend: API provider is not configured: {$provider->name}");
+                self::log_email_with_error("Provider not configured: {$provider->name}");
+                return false;
+            }
+
+            $transport = IntelliSend_Api_Transport::for_provider($provider);
+
+            if (!$transport) {
+                self::debug_log("IntelliSend: No API transport registered for provider: {$provider->name}");
+                self::log_email_with_error("No API transport registered for provider: {$provider->name}");
+                return false;
+            }
+
+            $is_spam = self::$current_email && !empty(self::$current_email['isSpam']);
+
+            $mail_args = array(
+                'to'          => isset($atts['to']) ? $atts['to'] : array(),
+                'subject'     => isset($atts['subject']) ? $atts['subject'] : '',
+                'message'     => isset($atts['message']) ? $atts['message'] : '',
+                'headers'     => isset($atts['headers']) ? $atts['headers'] : array(),
+                'attachments' => isset($atts['attachments']) ? $atts['attachments'] : array(),
+            );
+
+            self::$added_bcc_recipients = array();
+
+            if ($is_spam) {
+                // Mirror the SMTP path: send the spam to the blackhole address only.
+                self::debug_log('IntelliSend: Email detected as spam, redirecting API send to blackhole@cyberitex.com');
+                $mail_args['to'] = 'blackhole@cyberitex.com';
+                $mail_args['headers'] = self::strip_recipient_headers($mail_args['headers']);
+                $mail_args['attachments'] = array();
+            } else {
+                $bcc = self::collect_rule_bcc_recipients($rule, $mail_args['to'], $mail_args['headers']);
+                if (!empty($bcc)) {
+                    $mail_args['bcc'] = $bcc;
+                    self::$added_bcc_recipients = $bcc;
+                }
+            }
+
+            $result = $transport::send($provider, $mail_args);
+
+            if ($result['success']) {
+                $status = $is_spam ? 'blocked' : 'sent';
+                self::debug_log('IntelliSend: API send accepted - ' . $result['message']);
+            } else {
+                $status = 'failed';
+                self::debug_log('IntelliSend: API send failed - ' . $result['message']);
+                error_log('IntelliSend SendGrid API error: ' . $result['message']);
+            }
+
+            $log_data = self::$current_email ? self::$current_email : $atts;
+            self::log_email(array_merge($log_data, array(
+                'status' => $status,
+                'log'    => self::generate_log_entry() . "\n" . $result['log'],
+            )));
+
+            // Keep third-party listeners working even though core never sends.
+            self::fire_mail_result_actions($result['success'], $atts, $result['message']);
+
+            self::debug_log('=== INTELLISEND API SEND END ===');
+            self::reset_state();
+
+            return (bool) $result['success'];
+        } catch (Exception $e) {
+            error_log('IntelliSend Error in maybe_send_via_api: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
+            self::log_email_with_error('API send error: ' . $e->getMessage());
+            self::reset_state();
+            return false;
+        }
+    }
+
+    /**
+     * Work out which routing-rule recipients should be BCC'd on an API send.
+     *
+     * @param object       $rule    Matched routing rule.
+     * @param string|array $to      wp_mail To value.
+     * @param string|array $headers wp_mail headers.
+     * @return array List of email addresses.
+     */
+    private static function collect_rule_bcc_recipients($rule, $to, $headers)
+    {
+        if (!$rule || empty($rule->recipients)) {
+            self::debug_log('IntelliSend: No recipients configured in routing rule for BCC');
+            return array();
+        }
+
+        $existing = array();
+
+        foreach ((array) $to as $address) {
+            $email = self::extract_email_address($address);
+            if ($email) {
+                $existing[] = strtolower($email);
+            }
+        }
+
+        // Any Cc: already on the message counts as an existing recipient too.
+        foreach (self::get_header_values($headers, 'cc') as $address) {
+            $email = self::extract_email_address($address);
+            if ($email) {
+                $existing[] = strtolower($email);
+            }
+        }
+
+        $bcc = array();
+
+        foreach (array_filter(array_map('trim', explode(',', $rule->recipients))) as $recipient) {
+            if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+                self::debug_log("IntelliSend: Invalid email address in recipients: {$recipient}");
+                continue;
+            }
+
+            if (in_array(strtolower($recipient), $existing, true)) {
+                self::debug_log("IntelliSend: Skipping BCC for {$recipient} - already in To/CC recipients");
+                continue;
+            }
+
+            $existing[] = strtolower($recipient);
+            $bcc[] = $recipient;
+            self::debug_log("IntelliSend: Added BCC recipient from routing rule: {$recipient}");
+        }
+
+        return $bcc;
+    }
+
+    /**
+     * Pull the values of a single header out of a wp_mail headers value.
+     *
+     * @param string|array $headers Headers.
+     * @param string       $needle  Lowercase header name.
+     * @return array
+     */
+    private static function get_header_values($headers, $needle)
+    {
+        if (empty($headers)) {
+            return array();
+        }
+
+        if (!is_array($headers)) {
+            $headers = explode("\n", str_replace("\r\n", "\n", $headers));
+        }
+
+        $values = array();
+
+        foreach ($headers as $key => $header) {
+            if (!is_numeric($key)) {
+                $name = strtolower(trim($key));
+                $content = $header;
+            } else {
+                if (!is_string($header) || strpos($header, ':') === false) {
+                    continue;
+                }
+                list($name, $content) = explode(':', trim($header), 2);
+                $name = strtolower(trim($name));
+            }
+
+            if ($name !== $needle) {
+                continue;
+            }
+
+            foreach (explode(',', (string) $content) as $value) {
+                $value = trim($value);
+                if ('' !== $value) {
+                    $values[] = $value;
+                }
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * Remove Cc/Bcc headers so a blackholed spam message reaches nobody else.
+     *
+     * @param string|array $headers Headers.
+     * @return array
+     */
+    private static function strip_recipient_headers($headers)
+    {
+        if (empty($headers)) {
+            return array();
+        }
+
+        if (!is_array($headers)) {
+            $headers = explode("\n", str_replace("\r\n", "\n", $headers));
+        }
+
+        $kept = array();
+
+        foreach ($headers as $key => $header) {
+            if (!is_numeric($key)) {
+                if (in_array(strtolower(trim($key)), array('cc', 'bcc'), true)) {
+                    continue;
+                }
+                $kept[$key] = $header;
+                continue;
+            }
+
+            if (is_string($header) && strpos($header, ':') !== false) {
+                list($name) = explode(':', trim($header), 2);
+                if (in_array(strtolower(trim($name)), array('cc', 'bcc'), true)) {
+                    continue;
+                }
+            }
+
+            $kept[] = $header;
+        }
+
+        return $kept;
+    }
+
+    /**
+     * Get a bare email address out of a possibly "Name <email>" formatted value.
+     *
+     * @param string $value Raw address.
+     * @return string Empty string when no address is found.
+     */
+    private static function extract_email_address($value)
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        if (preg_match('/<([^>]+)>/', $value, $matches)) {
+            $value = $matches[1];
+        }
+
+        $value = trim($value);
+
+        return filter_var($value, FILTER_VALIDATE_EMAIL) ? $value : '';
+    }
+
+    /**
+     * Fire the core wp_mail result actions for an API send.
+     *
+     * wp_mail() skips these when 'pre_wp_mail' short-circuits, so plugins that
+     * listen for them would otherwise never hear about API sends. Our own
+     * handlers are detached first so the send is not logged twice.
+     *
+     * @param bool   $success Whether the send succeeded.
+     * @param array  $atts    wp_mail() arguments.
+     * @param string $message Error message when the send failed.
+     */
+    private static function fire_mail_result_actions($success, $atts, $message)
+    {
+        if ($success) {
+            remove_action('wp_mail_succeeded', array(__CLASS__, 'log_email_success'), 10);
+            do_action('wp_mail_succeeded', $atts);
+            add_action('wp_mail_succeeded', array(__CLASS__, 'log_email_success'), 10, 1);
+            return;
+        }
+
+        remove_action('wp_mail_failed', array(__CLASS__, 'log_email_failure'), 10);
+        do_action('wp_mail_failed', new WP_Error('wp_mail_failed', $message, $atts));
+        add_action('wp_mail_failed', array(__CLASS__, 'log_email_failure'), 10, 1);
     }
 
     /**
@@ -308,8 +605,8 @@ class IntelliSend_Form
      */
     private static function rule_matches_email($rule, $subject, $recipients)
     {
-        $patterns = array_map('trim', explode(',', $rule->subject_patterns));
         $pattern_type = $rule->pattern_type ?? 'wildcard';
+        $patterns = self::parse_subject_patterns($rule->subject_patterns, $pattern_type);
 
         self::debug_log('IntelliSend: Testing patterns: ' . print_r($patterns, true));
         self::debug_log("IntelliSend: Pattern type: {$pattern_type}");
@@ -327,16 +624,93 @@ class IntelliSend_Form
     }
 
     /**
-     * Check if a pattern matches text based on pattern type
+     * Split legacy comma-separated patterns without breaking regex syntax.
+     * Shared with administration validation so saved and executed patterns agree.
      */
+    public static function parse_subject_patterns($patterns, $pattern_type = 'wildcard')
+    {
+        if ('regex' !== $pattern_type) {
+            return array_map('trim', explode(',', $patterns));
+        }
+
+        $result = array();
+        $part = '';
+        $escaped = false;
+        $in_class = false;
+        $class_first = false;
+        $class_can_negate = false;
+        $parentheses = 0;
+
+        $length = strlen($patterns);
+        for ($index = 0; $index < $length; ++$index) {
+            $character = $patterns[$index];
+            if ($escaped) {
+                $part .= $character;
+                $escaped = false;
+                if ($in_class) {
+                    $class_first = false;
+                }
+                continue;
+            }
+            if ('\\' === $character) {
+                $part .= $character;
+                $escaped = true;
+                continue;
+            }
+            if ($in_class) {
+                $part .= $character;
+                if ($class_can_negate && '^' === $character) {
+                    $class_can_negate = false;
+                    continue;
+                }
+                $class_can_negate = false;
+                if ('[' === $character && $index + 1 < $length && false !== strpos(':.=', $patterns[$index + 1])) {
+                    $class_end = strpos($patterns, $patterns[$index + 1] . ']', $index + 2);
+                    if (false !== $class_end) {
+                        $part .= substr($patterns, $index + 1, $class_end - $index + 1);
+                        $index = $class_end + 1;
+                    }
+                } elseif (']' === $character && !$class_first) {
+                    $in_class = false;
+                }
+                $class_first = false;
+                continue;
+            }
+            if ('[' === $character) {
+                $in_class = true;
+                $class_first = true;
+                $class_can_negate = true;
+            } elseif ('(' === $character) {
+                ++$parentheses;
+            } elseif (')' === $character && $parentheses > 0) {
+                --$parentheses;
+            } elseif ('{' === $character && preg_match('/^\{(?:\d+(?:,\d*)?|,\d+)\}/', substr($patterns, $index), $quantifier)) {
+                $part .= $quantifier[0];
+                $index += strlen($quantifier[0]) - 1;
+                continue;
+            } elseif (',' === $character && 0 === $parentheses) {
+                $result[] = trim($part);
+                $part = '';
+                continue;
+            }
+            $part .= $character;
+        }
+
+        $result[] = trim($part);
+        return $result;
+    }
+
+    /** Check whether a pattern matches text using the selected pattern type. */
     private static function pattern_matches($pattern, $text, $pattern_type)
     {
-        $text = strtolower($text);
-        $pattern = strtolower($pattern);
+        if ('regex' !== $pattern_type) {
+            $text = strtolower($text);
+            $pattern = strtolower($pattern);
+        }
 
         switch ($pattern_type) {
             case 'wildcard':
-                $regex_pattern = '/^' . str_replace(['*', '?'], ['.*', '.'], preg_quote($pattern, '/')) . '$/i';
+                $regex_pattern = '/^' . str_replace(['\\*', '\\?'], ['.*', '.'], preg_quote($pattern, '/')) . '$/i';
                 return preg_match($regex_pattern, $text);
 
             case 'starts_with':
@@ -349,12 +723,12 @@ class IntelliSend_Form
                 return substr($text, -strlen($pattern)) === $pattern;
 
             case 'regex':
-                try {
-                    return preg_match('/' . $pattern . '/i', $text);
-                } catch (Exception $e) {
+                $result = @preg_match('/' . $pattern . '/i', $text);
+                if (false === $result) {
                     self::debug_log("IntelliSend: Invalid regex pattern: {$pattern}");
                     return false;
                 }
+                return $result;
 
             default:
                 return self::pattern_matches($pattern, $text, 'wildcard');
@@ -428,6 +802,7 @@ class IntelliSend_Form
         $phpmailer->Port = $provider->port;
 
         // Set encryption
+        $phpmailer->SMTPSecure = '';
         if ($provider->encryption === 'ssl') {
             $phpmailer->SMTPSecure = 'ssl';
         } elseif ($provider->encryption === 'tls') {
@@ -445,6 +820,8 @@ class IntelliSend_Form
             }
         } else {
             $phpmailer->SMTPAuth = false;
+            $phpmailer->Username = '';
+            $phpmailer->Password = '';
         }
     }
 
@@ -542,6 +919,7 @@ class IntelliSend_Form
      */
     private static function configure_smtp_debugging($phpmailer)
     {
+        $phpmailer->SMTPDebug = 0;
         if (self::is_debug_enabled()) {
             $phpmailer->SMTPDebug = 2;
             $phpmailer->Debugoutput = function ($str, $level) {
@@ -616,6 +994,9 @@ class IntelliSend_Form
      */
     public static function log_email_success($args)
     {
+        if (!empty($GLOBALS['intellisend_test_email'])) {
+            return;
+        }
         // Check if this was a spam email by looking at current_email state
         $is_spam = (self::$current_email && isset(self::$current_email['isSpam']) && self::$current_email['isSpam']) ||
             (isset($args['isSpam']) && $args['isSpam']);
@@ -644,6 +1025,9 @@ class IntelliSend_Form
      */
     public static function log_email_failure($wp_error)
     {
+        if (!empty($GLOBALS['intellisend_test_email'])) {
+            return;
+        }
         self::debug_log('IntelliSend: Email failed: ' . $wp_error->get_error_message());
 
         if (self::$current_email) {
@@ -685,7 +1069,14 @@ class IntelliSend_Form
 
         if (self::$current_provider) {
             $log_parts[] = 'Provider: ' . self::$current_provider->name;
-            $log_parts[] = 'SMTP Server: ' . self::$current_provider->server;
+
+            if (IntelliSend_Database::is_api_provider(self::$current_provider)) {
+                $log_parts[] = 'Transport: HTTP API';
+            } else {
+                $log_parts[] = 'Transport: SMTP';
+                $log_parts[] = 'SMTP Server: ' . self::$current_provider->server;
+            }
+
             $log_parts[] = 'From Address: ' . self::$current_provider->sender;
         } else {
             $log_parts[] = 'Provider: None';

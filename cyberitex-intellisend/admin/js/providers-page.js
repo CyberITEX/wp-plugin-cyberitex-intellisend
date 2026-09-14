@@ -24,7 +24,12 @@
             this.providerPasswordField = $('#provider-password');
             this.providerSenderField = $('#provider-sender');
             this.isDefaultField = $('#is-default');
-            
+            this.providerTypeField = $('#provider-type');
+            this.providerApiKeyField = $('#provider-api-key');
+            this.providerApiEndpointField = $('#provider-api-endpoint');
+            this.providerApiIdentityField = $('#provider-api-identity');
+            this.testRecipientField = $('#provider-test-recipient');
+
             this.setupEventListeners();
             this.setupPasswordToggle();
             this.setupAutoPopulateSender();
@@ -58,6 +63,16 @@
                 self.resetForm();
             });
             
+            // Test API key button
+            $('#test-api-key-btn').on('click', function() {
+                self.testApiKey();
+            });
+
+            // Send a real test message through the selected provider
+            $('#send-provider-test-btn').on('click', function() {
+                self.sendTestEmail();
+            });
+
             // Dismiss notification
             $(document).on('click', '.intellisend-notice', function() {
                 $(this).fadeOut(300);
@@ -68,18 +83,14 @@
          * Password visibility toggle
          */
         setupPasswordToggle: function() {
-            const $passwordField = $('#provider-password');
-            const $toggleButton = $('.password-toggle');
-            
-            $toggleButton.on('click', function() {
-                const isVisible = $passwordField.attr('type') === 'text';
-                
-                // Toggle visibility
-                $passwordField.attr('type', isVisible ? 'password' : 'text');
+            $('.password-toggle').on('click', function() {
+                // Reveal the secret field that sits inside the same container
+                const $field = $(this).closest('.password-field-container').find('input');
+                const isVisible = $field.attr('type') === 'text';
+
+                $field.attr('type', isVisible ? 'password' : 'text');
                 $(this).toggleClass('show-password');
-                
-                // Focus back on the field
-                $passwordField.focus();
+                $field.focus();
             });
         },
         
@@ -137,6 +148,20 @@
                 this.updateProviderDescription(this.providerSelector.find('option:selected'));
             }
         },
+
+        /**
+         * Report the missing-transport case rather than silently doing nothing
+         */
+        requireTransport: function() {
+            const transport = this.currentTransport();
+
+            if (!transport) {
+                this.showNotification('error', 'No API transport is registered for this provider.');
+                return null;
+            }
+
+            return transport;
+        },
         
         /**
          * Handle provider selection change
@@ -189,6 +214,7 @@
             
             // Set form fields
             this.providerIdField.val($selectedOption.data('id') || '');
+            this.providerTypeField.val($selectedOption.data('type') || 'smtp');
             this.providerServerField.val($selectedOption.data('server') || '');
             this.providerPortField.val($selectedOption.data('port') || '587');
             this.providerUsernameField.val($selectedOption.data('username') || '');
@@ -197,9 +223,147 @@
             const sender = $selectedOption.data('sender');
             const username = $selectedOption.data('username') || '';
             this.providerSenderField.val(sender || username);
-            
-            // Always clear password for security
+
+            // Always clear secrets for security
             this.providerPasswordField.val('');
+            this.providerApiKeyField.val('');
+            this.providerApiIdentityField.val('');
+
+            if (this.providerTypeField.val() === 'api') {
+                this.applyTransport(providerName, $selectedOption);
+            }
+        },
+
+        /**
+         * Whether the selected provider sends over an HTTP API
+         */
+        isApiProvider: function() {
+            return this.providerTypeField.val() === 'api';
+        },
+
+        /**
+         * Description of the transport backing the selected API provider
+         */
+        currentTransport: function() {
+            const all = (window.intellisendProviders && window.intellisendProviders.transports) || {};
+            return all[this.providerSelector.val()] || null;
+        },
+
+        /**
+         * Fill the API fields from the selected transport's description:
+         * region choices, key placeholder, hints, and whether the key is
+         * managed outside the database.
+         */
+        applyTransport: function(providerName, $selectedOption) {
+            const all = (window.intellisendProviders && window.intellisendProviders.transports) || {};
+            const transport = all[providerName];
+
+            if (!transport) {
+                return;
+            }
+
+            // Field labels come from the transport, so wording matches the vendor
+            $('.api-key-label').text(transport.keyLabel || 'API Key');
+            $('.api-region-label').text(transport.regionLabel || 'Data Residency');
+
+            // Identity: the non-secret half of a credential pair (AWS Access Key ID)
+            const identityManaged = transport.identitySource === 'constant' || transport.identitySource === 'environment';
+
+            this.providerApiIdentityField
+                .attr('placeholder', transport.identityPlaceholder || '')
+                .prop('disabled', identityManaged)
+                .val(identityManaged ? '' : ($selectedOption.data('username') || ''));
+
+            $('.api-identity-label').text(transport.identityLabel || '');
+
+            if (identityManaged) {
+                $('.api-identity-hint').text(
+                    'Using the ' + transport.identityConstant +
+                    (transport.identitySource === 'constant' ? ' constant from wp-config.php.' : ' environment variable.')
+                );
+            } else {
+                $('.api-identity-hint').text(
+                    transport.identityConstant
+                        ? 'You can also define ' + transport.identityConstant + ' in wp-config.php instead.'
+                        : ''
+                );
+            }
+
+            // Region / data residency choices
+            const regions = transport.regions || {};
+            const values = Object.keys(regions);
+            const $endpoint = this.providerApiEndpointField;
+
+            $endpoint.empty();
+            values.forEach(function(value) {
+                $endpoint.append($('<option></option>').attr('value', value).text(regions[value]));
+            });
+
+            const saved = $selectedOption.data('api-endpoint');
+            $endpoint.val(regions[saved] ? saved : (transport.defaultBase || values[0]));
+
+            // Key field: placeholder, lock state, and where the key comes from
+            const managed = transport.keySource === 'constant' || transport.keySource === 'environment';
+            const constantName = transport.envConstant || '';
+
+            this.providerApiKeyField
+                .attr('placeholder', managed ? '' : (transport.keyPlaceholder || ''))
+                .prop('disabled', managed);
+
+            let hint;
+            if (transport.keySource === 'constant') {
+                hint = 'Using the ' + constantName + ' constant from wp-config.php. Remove it to manage the key here.';
+            } else if (transport.keySource === 'environment') {
+                hint = 'Using the ' + constantName + ' environment variable. Unset it to manage the key here.';
+            } else if (String($selectedOption.data('has-api-key')) === '1') {
+                hint = 'A key is saved (encrypted). Leave blank to keep it, or paste a new one to replace it.';
+            } else {
+                hint = 'Stored encrypted. You can also define ' + constantName + ' in wp-config.php instead.';
+            }
+
+            $('.api-key-hint').text(hint);
+            $('.api-sender-hint').text(transport.senderHint || '');
+        },
+
+        /**
+         * Validate the API key against the provider without saving it
+         */
+        testApiKey: function() {
+            const self = this;
+
+            if (!this.requireTransport()) {
+                return;
+            }
+
+            const $button = $('#test-api-key-btn');
+
+            $button.prop('disabled', true).addClass('loading');
+            $button.data('original-text', $button.text()).text('Testing...');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_check_provider_api_key',
+                    nonce: $('#intellisend_providers_nonce').val(),
+                    provider_name: this.providerSelector.val(),
+                    api_key: this.providerApiKeyField.val().trim()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        self.showNotification('success', response.data.message);
+                    } else {
+                        self.showNotification('error', (response.data && response.data.message) || 'API key check failed');
+                    }
+                },
+                error: function() {
+                    self.showNotification('error', 'A network error occurred');
+                },
+                complete: function() {
+                    $button.prop('disabled', false).removeClass('loading');
+                    $button.text($button.data('original-text'));
+                }
+            });
         },
         
         /**
@@ -218,24 +382,40 @@
             $saveButton.prop('disabled', true).addClass('loading');
             $saveButton.data('original-text', $saveButton.text()).text('Saving...');
             
+            const isApi = this.isApiProvider();
+
             // Get form data
             const formData = {
                 action: 'intellisend_save_provider',
                 nonce: $('#intellisend_providers_nonce').val(),
                 provider_id: this.providerIdField.val(),
                 provider_name: this.providerSelector.val(),
-                provider_server: this.providerServerField.val(),
-                provider_port: this.providerPortField.val(),
-                provider_username: this.providerUsernameField.val(),
+                provider_type: this.providerTypeField.val(),
                 provider_sender: this.providerSenderField.val(),
                 is_default: this.isDefaultField.val()
             };
-            
-            // Only include password if it's not empty
-            // This prevents clearing saved passwords when nothing is entered
-            const password = this.providerPasswordField.val().trim();
-            if (password) {
-                formData.provider_password = password;
+
+            if (isApi) {
+                formData.provider_api_endpoint = this.providerApiEndpointField.val();
+                formData.provider_api_identity = this.providerApiIdentityField.val();
+
+                // Only send the key when a new one was typed, so a blank field
+                // keeps whatever is already stored.
+                const apiKey = this.providerApiKeyField.val().trim();
+                if (apiKey) {
+                    formData.provider_api_key = apiKey;
+                }
+            } else {
+                formData.provider_server = this.providerServerField.val();
+                formData.provider_port = this.providerPortField.val();
+                formData.provider_username = this.providerUsernameField.val();
+
+                // Only include password if it's not empty
+                // This prevents clearing saved passwords when nothing is entered
+                const password = this.providerPasswordField.val().trim();
+                if (password) {
+                    formData.provider_password = password;
+                }
             }
             
             // Send AJAX request
@@ -250,18 +430,35 @@
                         
                         // Update the option attributes with new data
                         const $option = self.providerSelector.find('option[value="' + formData.provider_name + '"]');
-                        $option.data('username', formData.provider_username);
                         $option.data('sender', formData.provider_sender);
-                        $option.data('server', formData.provider_server);
-                        $option.data('port', formData.provider_port);
-                        
-                        // Mark as configured and update the option text
-                        $option.text(formData.provider_name.charAt(0).toUpperCase() + formData.provider_name.slice(1) + ' (Configured)');
-                        
+
+                        if (isApi) {
+                            $option.data('api-endpoint', formData.provider_api_endpoint);
+                            $option.data('username', formData.provider_api_identity || '');
+                            if (formData.provider_api_key) {
+                                $option.data('has-api-key', '1');
+                            }
+                        } else {
+                            $option.data('username', formData.provider_username);
+                            $option.data('server', formData.provider_server);
+                            $option.data('port', formData.provider_port);
+                        }
+
+                        // Update the option text using the label the server reports
+                        const label = (response.data && response.data.label) || formData.provider_name;
+                        const isConfigured = !response.data || response.data.configured !== 0;
+                        $option.text(isConfigured ? label + ' (Configured)' : label).data('configured', isConfigured ? '1' : '0');
+
                         // Clear the description since it's now configured
-                        $option.removeData('description');
-                        $option.removeData('help-link');
-                        $('#provider-description').fadeOut(200);
+                        if (isConfigured) {
+                            $option.removeData('description');
+                            $option.removeData('help-link');
+                            $('#provider-description').fadeOut(200);
+                        }
+
+                        // Clear the secret box so the saved value is never echoed back
+                        self.providerApiKeyField.val('');
+                    self.providerPasswordField.val('');
                         
                         // If this was the first provider configured, show additional message
                         if (response.data.message.includes('Default routing rule')) {
@@ -284,6 +481,61 @@
         },
         
         /**
+         * Send a test email through the provider currently selected.
+         *
+         * Works for SMTP presets and API transports alike: the server decides
+         * which path to take from the provider's stored transport type.
+         */
+        sendTestEmail: function() {
+            const self = this;
+            const $button = $('#send-provider-test-btn');
+            const recipient = this.testRecipientField.val().trim();
+
+            $('.field-error').remove();
+            $('.has-error').removeClass('has-error').removeAttr('aria-invalid');
+
+            if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+                this.showFieldError(this.testRecipientField, 'Enter a valid recipient email');
+                return;
+            }
+
+            // Credentials are read from the database, so unsaved edits are not tested.
+            const $option = this.providerSelector.find('option:selected');
+            if (String($option.data('configured')) !== '1') {
+                this.showNotification('error', 'Save this provider before sending a test.');
+                return;
+            }
+
+            $button.prop('disabled', true).addClass('loading');
+            $button.data('original-text', $button.text()).text('Sending...');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'intellisend_send_test_email',
+                    nonce: $('#intellisend_providers_nonce').val(),
+                    provider_id: this.providerSelector.val(),
+                    test_email: recipient
+                },
+                success: function(response) {
+                    if (response.success) {
+                        self.showNotification('success', (response.data && response.data.message) || 'Test email sent.');
+                    } else {
+                        self.showNotification('error', (response.data && response.data.message) || 'Failed to send the test email.');
+                    }
+                },
+                error: function() {
+                    self.showNotification('error', 'A network error occurred');
+                },
+                complete: function() {
+                    $button.prop('disabled', false).removeClass('loading');
+                    $button.text($button.data('original-text'));
+                }
+            });
+        },
+
+        /**
          * Reset form to current provider data
          */
         resetForm: function() {
@@ -303,12 +555,53 @@
         validateForm: function() {
             // Remove any previous error messages
             $('.field-error').remove();
-            $('.has-error').removeClass('has-error');
+            $('.has-error').removeClass('has-error').removeAttr('aria-invalid');
             
             let isValid = true;
-            
-            // Validate server for "other" provider
-            if (this.providerSelector.val() === 'other' && !this.providerServerField.val().trim()) {
+
+            // API transports validate the key and sender instead of SMTP credentials
+            if (this.isApiProvider()) {
+                const sender = this.providerSenderField.val().trim();
+
+                if (!sender) {
+                    this.showFieldError(this.providerSenderField, 'Sender Email is required');
+                    isValid = false;
+                }
+
+                const $option = this.providerSelector.find('option:selected');
+                const hasApiKey = String($option.data('has-api-key')) === '1';
+                const keyIsManaged = this.providerApiKeyField.prop('disabled');
+                const transport = this.currentTransport();
+
+                const keyLabel = (transport && transport.keyLabel) || 'API Key';
+
+                if (!hasApiKey && !keyIsManaged && !this.providerApiKeyField.val().trim()) {
+                    const constantName = (transport && transport.envConstant) || '';
+                    this.showFieldError(
+                        this.providerApiKeyField,
+                        constantName
+                            ? keyLabel + ' is required, or define ' + constantName + ' in wp-config.php'
+                            : keyLabel + ' is required'
+                    );
+                    isValid = false;
+                }
+
+                // Vendors with a credential pair need the identity too
+                if (transport && transport.requiresIdentity && !this.providerApiIdentityField.prop('disabled')
+                    && !this.providerApiIdentityField.val().trim()) {
+                    this.showFieldError(
+                        this.providerApiIdentityField,
+                        transport.identityLabel + ' is required, or define ' + transport.identityConstant + ' in wp-config.php'
+                    );
+                    isValid = false;
+                }
+
+                return isValid;
+            }
+
+            // Validate the host whenever the field is editable for this provider
+            const $selected = this.providerSelector.find('option:selected');
+            if (String($selected.data('editable-server')) === '1' && !this.providerServerField.val().trim()) {
                 this.showFieldError(this.providerServerField, 'SMTP Server is required');
                 isValid = false;
             }
@@ -337,7 +630,7 @@
          */
         showFieldError: function($field, message) {
             $field.addClass('has-error');
-            $field.after('<span class="field-error">' + message + '</span>');
+            $field.attr('aria-invalid', 'true').after($('<span class="field-error" role="alert"></span>').text(message));
         },
         
         /**
@@ -347,7 +640,7 @@
             // Remove any existing notifications
             $('.intellisend-notification').remove();
             
-            const notification = $('<div class="intellisend-notification ' + type + '">' + message + '</div>');
+            const notification = $('<div class="intellisend-notification"></div>').addClass(type).attr('role', type === 'error' ? 'alert' : 'status').text(message);
             
             $('body').append(notification);
             
@@ -370,9 +663,35 @@
          */
         updateUIState: function() {
             const selectedProvider = this.providerSelector.val();
-            
-            // Show SMTP server and port fields only if provider is "other"
-            if (selectedProvider && selectedProvider.toLowerCase() === 'other') {
+            const isApi = this.isApiProvider();
+
+            const transport = this.currentTransport();
+
+            if (isApi) {
+                // API transports have no host, port, username or password
+                $('.smtp-field').slideUp(300);
+                $('.smtp-only-field').slideUp(300);
+                $('.api-field').not('.api-region-field').not('.api-identity-field').slideDown(300);
+
+                // A single region is not a choice, so keep that row hidden
+                const regionCount = transport ? Object.keys(transport.regions || {}).length : 0;
+                $('.api-region-field')[regionCount > 1 ? 'slideDown' : 'slideUp'](300);
+
+                // Only vendors with a credential pair get the identity row
+                $('.api-identity-field')[transport && transport.requiresIdentity ? 'slideDown' : 'slideUp'](300);
+
+                $('.api-sender-hint').show();
+                return;
+            }
+
+            $('.api-field').slideUp(300);
+            $('.api-sender-hint').hide();
+            $('.smtp-only-field').slideDown(300);
+
+            // The host row is editable for "other" and for presets whose host
+            // is region specific, such as Amazon SES.
+            const $option = this.providerSelector.find('option:selected');
+            if (String($option.data('editable-server')) === '1') {
                 $('.smtp-field').slideDown(300);
             } else {
                 $('.smtp-field').slideUp(300);

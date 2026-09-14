@@ -391,6 +391,80 @@
     }
 }
 
+
+/* Web API transport fields (SendGrid Web API and friends) */
+.api-field {
+    background-color: #f6f7f7;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    border-left: 3px solid #2271b1;
+    transition: all 0.3s ease;
+}
+
+.api-field .provider-field {
+    width: 100%;
+}
+
+.api-field #test-api-key-btn {
+    margin-top: 10px;
+}
+
+.api-field .field-description {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #646970;
+    line-height: 1.5;
+}
+
+.api-sender-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #646970;
+}
+
+.api-field input:disabled {
+    background-color: #f0f0f1;
+    color: #8c8f94;
+    cursor: not-allowed;
+}
+
+
+/* Send-test row in the providers footer */
+.provider-test-send {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e2e4e7;
+}
+
+.provider-test-send label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.provider-test-send .input-with-button {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.provider-test-send input[type="email"] {
+    flex: 1;
+    min-width: 220px;
+}
+
+.provider-test-send .field-description {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #646970;
+}
+
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
     .admin-color-modern .intellisend-providers-container {
@@ -417,6 +491,28 @@
     
     .admin-color-modern .smtp-field {
         background-color: #23282d;
+    }
+
+    .admin-color-modern .api-field {
+        background-color: #23282d;
+        border-left-color: #72aee6;
+    }
+
+    .admin-color-modern .provider-test-send {
+        border-bottom-color: #32373c;
+    }
+
+    .admin-color-modern .provider-test-send label {
+        color: #e2e4e7;
+    }
+
+    .admin-color-modern .provider-test-send .field-description {
+        color: #a7aaad;
+    }
+
+    .admin-color-modern .api-field .field-description,
+    .admin-color-modern .api-sender-hint {
+        color: #a7aaad;
     }
     
     .admin-color-modern .intellisend-providers-footer {

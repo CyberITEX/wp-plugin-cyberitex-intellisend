@@ -68,12 +68,13 @@ function intellisend_render_reports_page_content() {
         $filters['search'] = sanitize_text_field( $_GET['search'] );
     }
 
-    // Get reports
-    $reports = IntelliSend_Database::get_reports( $filters );
-
     // Get total count for pagination
     $total_reports = IntelliSend_Database::count_reports( $filters );
     $total_pages = ceil( $total_reports / $per_page );
+    // Keep stale links and negative page values within the filtered result set.
+    $page = max( 1, min( $page, max( 1, (int) $total_pages ) ) );
+    $filters['page'] = $page;
+    $reports = IntelliSend_Database::get_reports( $filters );
     ?>
     <div class="wrap intellisend-admin">
         <h1><?php echo esc_html__( 'Email Reports', 'intellisend' ); ?></h1>
@@ -94,10 +95,10 @@ function intellisend_render_reports_page_content() {
                                     <option value="sent" <?php selected( isset( $_GET['status'] ) ? $_GET['status'] : '', 'sent' ); ?>>
                                         <?php echo esc_html__( 'Sent', 'intellisend' ); ?>
                                     </option>
-                                    <option value="spam" <?php selected( isset( $_GET['status'] ) ? $_GET['status'] : '', 'spam' ); ?>>
+                                    <option value="blocked" <?php selected( isset( $_GET['status'] ) ? $_GET['status'] : '', 'blocked' ); ?>>
                                         <?php echo esc_html__( 'Spam', 'intellisend' ); ?>
                                     </option>
-                                    <option value="error" <?php selected( isset( $_GET['status'] ) ? $_GET['status'] : '', 'error' ); ?>>
+                                    <option value="failed" <?php selected( isset( $_GET['status'] ) ? $_GET['status'] : '', 'failed' ); ?>>
                                         <?php echo esc_html__( 'Error', 'intellisend' ); ?>
                                     </option>
                                 </select>
@@ -173,12 +174,12 @@ function intellisend_render_reports_page_content() {
                             <thead>
                                 <tr>
                                     <th class="checkbox-column">
-                                        <input type="checkbox" id="select-all-reports">
+                                        <input type="checkbox" id="select-all-reports" aria-label="<?php echo esc_attr__( 'Select all reports', 'intellisend' ); ?>">
                                     </th>
                                     <th class="sortable" data-sort="date">
                                         <?php 
-                                        echo esc_html__( 'Date', 'intellisend' );
-                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'date' ? $_GET['order'] : '';
+                                        echo esc_html__( 'Date (site time)', 'intellisend' );
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'date' ? ($_GET['order'] ?? '') : '';
                                         if ($current_order) {
                                             echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
                                         }
@@ -187,7 +188,7 @@ function intellisend_render_reports_page_content() {
                                     <th class="sortable" data-sort="status">
                                         <?php 
                                         echo esc_html__( 'Status', 'intellisend' );
-                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'status' ? $_GET['order'] : '';
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'status' ? ($_GET['order'] ?? '') : '';
                                         if ($current_order) {
                                             echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
                                         }
@@ -196,7 +197,7 @@ function intellisend_render_reports_page_content() {
                                     <th class="sortable" data-sort="subject">
                                         <?php 
                                         echo esc_html__( 'Subject', 'intellisend' );
-                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'subject' ? $_GET['order'] : '';
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'subject' ? ($_GET['order'] ?? '') : '';
                                         if ($current_order) {
                                             echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
                                         }
@@ -205,7 +206,7 @@ function intellisend_render_reports_page_content() {
                                     <th class="sortable" data-sort="sender">
                                         <?php 
                                         echo esc_html__( 'From', 'intellisend' );
-                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'sender' ? $_GET['order'] : '';
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'sender' ? ($_GET['order'] ?? '') : '';
                                         if ($current_order) {
                                             echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
                                         }
@@ -214,7 +215,7 @@ function intellisend_render_reports_page_content() {
                                     <th class="sortable" data-sort="recipients">
                                         <?php 
                                         echo esc_html__( 'To', 'intellisend' );
-                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'recipients' ? $_GET['order'] : '';
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'recipients' ? ($_GET['order'] ?? '') : '';
                                         if ($current_order) {
                                             echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
                                         }
@@ -223,7 +224,7 @@ function intellisend_render_reports_page_content() {
                                     <th class="sortable" data-sort="providerName">
                                         <?php 
                                         echo esc_html__( 'Provider', 'intellisend' );
-                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'providerName' ? $_GET['order'] : '';
+                                        $current_order = isset($_GET['orderby']) && $_GET['orderby'] === 'providerName' ? ($_GET['order'] ?? '') : '';
                                         if ($current_order) {
                                             echo '<span class="sort-indicator ' . ($current_order === 'asc' ? 'asc' : 'desc') . '"></span>';
                                         }
@@ -236,7 +237,7 @@ function intellisend_render_reports_page_content() {
                                 <?php foreach ( $reports as $report ) : ?>
                                     <tr>
                                         <td class="checkbox-column">
-                                            <input type="checkbox" class="report-checkbox" data-id="<?php echo esc_attr( $report->id ); ?>">
+                                            <input type="checkbox" aria-label="<?php echo esc_attr__( 'Select report', 'intellisend' ); ?>" class="report-checkbox" data-id="<?php echo esc_attr( $report->id ); ?>">
                                         </td>
                                         <td><?php echo esc_html( date( 'Y-m-d H:i', strtotime( $report->date ) ) ); ?></td>
                                         <td>
@@ -348,10 +349,10 @@ function intellisend_render_reports_page_content() {
     </div>
     
     <!-- Report Details Modal -->
-    <div id="view-report-modal" class="intellisend-modal">
+    <div id="view-report-modal" class="intellisend-modal" role="dialog" aria-modal="true" aria-labelledby="report-modal-title" tabindex="-1">
         <div class="intellisend-modal-content">
             <div class="intellisend-modal-header">
-                <h3><?php echo esc_html__( 'Email Report Details', 'intellisend' ); ?></h3>
+                <h3 id="report-modal-title"><?php echo esc_html__( 'Email Report Details', 'intellisend' ); ?></h3>
                 <button type="button" class="intellisend-modal-close" aria-label="<?php echo esc_attr__( 'Close', 'intellisend' ); ?>">
                     <span class="dashicons dashicons-no-alt"></span>
                 </button>
@@ -361,7 +362,7 @@ function intellisend_render_reports_page_content() {
                     <h3><?php echo esc_html__( 'General Information', 'intellisend' ); ?></h3>
                     <table class="widefat">
                         <tr>
-                            <th><?php echo esc_html__( 'Date', 'intellisend' ); ?></th>
+                            <th><?php echo esc_html__( 'Date (site time)', 'intellisend' ); ?></th>
                             <td id="report-date"></td>
                         </tr>
                         <tr>
