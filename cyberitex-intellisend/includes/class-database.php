@@ -246,7 +246,7 @@ class IntelliSend_Database
                     $settings_table,
                     array(
                         'defaultProviderName' => 'other',
-                        'antiSpamEndPoint' => 'https://api.cyberitex.com/v1/tools/SpamCheck',
+                        'antiSpamEndPoint' => 'https://api.cyberitex.com/v1/tools/spamCheck',
                         'antiSpamApiKey' => '',
                         'testRecipient' => $admin_email,
                         'spamTestMessage' => 'CONGRATULATIONS! You have been selected to receive a FREE $500 Gift Card! Click here to claim: http://claim-your-prize-now.example.com Limited time offer! Reply now or call +1-555-123-4567. This is a one-time message, to unsubscribe reply STOP.',
@@ -873,7 +873,7 @@ class IntelliSend_Database
                     );
                 } else {
                     $settings_data = array_merge($settings_data, array(
-                        'antiSpamEndPoint' => 'https://api.cyberitex.com/v1/tools/SpamCheck',
+                        'antiSpamEndPoint' => 'https://api.cyberitex.com/v1/tools/spamCheck',
                         'antiSpamApiKey' => '',
                         'testRecipient' => get_option('admin_email'),
                         'spamTestMessage' => 'This is a test spam message from IntelliSend.',

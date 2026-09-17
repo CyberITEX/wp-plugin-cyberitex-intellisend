@@ -382,8 +382,10 @@
     color: var(--is-warning-text);
 }
 
-/* Toasts are injected outside the page wrapper. */
-.intellisend-toast,
+/* Notices are injected outside the page wrapper.
+   Toasts are deliberately absent here: intellisend-toast.js owns their colours
+   so each type can carry a solid background, and a token set at this
+   specificity would have to be fought off type by type. */
 .intellisend-notification,
 .intellisend-notice {
     --is-toast-surface: #ffffff;
@@ -394,118 +396,12 @@
     border-color: #dcdcde;
 }
 
-.intellisend-toast .toast-title,
-.intellisend-toast .toast-message,
 .intellisend-notification .intellisend-notice-content {
     color: var(--is-toast-text);
 }
 
-.intellisend-toast .toast-close,
 .intellisend-toast-close {
     color: var(--is-toast-muted);
-}
-
-@media (prefers-color-scheme: dark) {
-    body.toplevel_page_intellisend,
-    body.intellisend_page_intellisend-providers,
-    body.intellisend_page_intellisend-routing,
-    body.intellisend_page_intellisend-reports,
-    body.toplevel_page_intellisend #wpwrap,
-    body.intellisend_page_intellisend-providers #wpwrap,
-    body.intellisend_page_intellisend-routing #wpwrap,
-    body.intellisend_page_intellisend-reports #wpwrap,
-    body.toplevel_page_intellisend #wpcontent,
-    body.intellisend_page_intellisend-providers #wpcontent,
-    body.intellisend_page_intellisend-routing #wpcontent,
-    body.intellisend_page_intellisend-reports #wpcontent,
-    body.toplevel_page_intellisend #wpbody,
-    body.intellisend_page_intellisend-providers #wpbody,
-    body.intellisend_page_intellisend-routing #wpbody,
-    body.intellisend_page_intellisend-reports #wpbody {
-        background: #111827;
-    }
-
-    body.toplevel_page_intellisend #wpfooter,
-    body.intellisend_page_intellisend-providers #wpfooter,
-    body.intellisend_page_intellisend-routing #wpfooter,
-    body.intellisend_page_intellisend-reports #wpfooter {
-        color: #aeb9c8;
-    }
-
-    body.toplevel_page_intellisend #wpfooter a,
-    body.intellisend_page_intellisend-providers #wpfooter a,
-    body.intellisend_page_intellisend-routing #wpfooter a,
-    body.intellisend_page_intellisend-reports #wpfooter a {
-        color: #72aee6;
-    }
-
-    .toplevel_page_intellisend,
-    .intellisend_page_intellisend-providers,
-    .intellisend_page_intellisend-routing,
-    .intellisend_page_intellisend-reports,
-    .intellisend-settings-wrap,
-    .intellisend-providers-wrap,
-    .intellisend-admin {
-        --is-page: #111827;
-        --is-surface: #1f2937;
-        --is-surface-raised: #243244;
-        --is-surface-muted: #273548;
-        --is-surface-hover: #334155;
-        --is-border: #3f4c60;
-        --is-border-strong: #526176;
-        --is-text: #f8fafc;
-        --is-text-secondary: #d7dee8;
-        --is-text-muted: #aeb9c8;
-        --is-link: #72aee6;
-        --is-link-hover: #9ecbf0;
-        --is-focus: #72aee6;
-        --is-shadow: rgba(0, 0, 0, 0.35);
-        --is-input: #111827;
-        --is-disabled: #263244;
-        --is-success-bg: #173d2a;
-        --is-success-text: #9ee6b3;
-        --is-warning-bg: #493713;
-        --is-warning-text: #f8d57e;
-        --is-danger-bg: #4b2028;
-        --is-danger-text: #ffb4bd;
-        color-scheme: dark;
-    }
-
-    .intellisend-settings-wrap select,
-    .intellisend-providers-wrap select,
-    .intellisend-admin select {
-        background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg width='20' height='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 8l5 5 5-5' stroke='%23d7dee8' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    }
-
-    .intellisend-admin .intellisend-modal {
-        background: rgba(2, 6, 23, 0.76);
-    }
-
-    .intellisend-providers-wrap .provider-info {
-        background: rgba(114, 174, 230, 0.12);
-    }
-
-    .intellisend-admin .intellisend-loading-overlay,
-    #page-loading-overlay {
-        background: rgba(17, 24, 39, 0.9);
-    }
-
-    .intellisend-admin .intellisend-table tbody tr,
-    .intellisend-admin .intellisend-table tbody td {
-        border-color: var(--is-border);
-    }
-
-    .intellisend-toast,
-    .intellisend-notification,
-    .intellisend-notice {
-        --is-toast-surface: #1f2937;
-        --is-toast-text: #f8fafc;
-        --is-toast-muted: #aeb9c8;
-        background: var(--is-toast-surface);
-        color: var(--is-toast-text);
-        border-color: #3f4c60;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
-    }
 }
 
 @media (prefers-contrast: more) {

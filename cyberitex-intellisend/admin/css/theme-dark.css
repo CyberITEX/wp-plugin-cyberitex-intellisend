@@ -1,0 +1,441 @@
+/**
+ * IntelliSend optional dark colour scheme.
+ *
+ * IntelliSend renders light by default on every screen, regardless of the
+ * operating system preference. These rules were previously inlined in the
+ * stylesheets named below and followed prefers-color-scheme automatically,
+ * which meant an admin on a dark desktop got a dark plugin with no way back.
+ *
+ * They are preserved here verbatim and are only loaded when a site opts in:
+ *
+ *     add_filter( 'intellisend_enable_dark_mode', '__return_true' );
+ *
+ * Once loaded they still honour prefers-color-scheme, so opting in means
+ * "follow the operating system" rather than "always dark".
+ */
+
+/* ---------- extracted from theme.css ---------- */
+@media (prefers-color-scheme: dark) {
+    body.toplevel_page_intellisend,
+    body.intellisend_page_intellisend-providers,
+    body.intellisend_page_intellisend-routing,
+    body.intellisend_page_intellisend-reports,
+    body.toplevel_page_intellisend #wpwrap,
+    body.intellisend_page_intellisend-providers #wpwrap,
+    body.intellisend_page_intellisend-routing #wpwrap,
+    body.intellisend_page_intellisend-reports #wpwrap,
+    body.toplevel_page_intellisend #wpcontent,
+    body.intellisend_page_intellisend-providers #wpcontent,
+    body.intellisend_page_intellisend-routing #wpcontent,
+    body.intellisend_page_intellisend-reports #wpcontent,
+    body.toplevel_page_intellisend #wpbody,
+    body.intellisend_page_intellisend-providers #wpbody,
+    body.intellisend_page_intellisend-routing #wpbody,
+    body.intellisend_page_intellisend-reports #wpbody {
+        background: #111827;
+    }
+
+    body.toplevel_page_intellisend #wpfooter,
+    body.intellisend_page_intellisend-providers #wpfooter,
+    body.intellisend_page_intellisend-routing #wpfooter,
+    body.intellisend_page_intellisend-reports #wpfooter {
+        color: #aeb9c8;
+    }
+
+    body.toplevel_page_intellisend #wpfooter a,
+    body.intellisend_page_intellisend-providers #wpfooter a,
+    body.intellisend_page_intellisend-routing #wpfooter a,
+    body.intellisend_page_intellisend-reports #wpfooter a {
+        color: #72aee6;
+    }
+
+    .toplevel_page_intellisend,
+    .intellisend_page_intellisend-providers,
+    .intellisend_page_intellisend-routing,
+    .intellisend_page_intellisend-reports,
+    .intellisend-settings-wrap,
+    .intellisend-providers-wrap,
+    .intellisend-admin {
+        --is-page: #111827;
+        --is-surface: #1f2937;
+        --is-surface-raised: #243244;
+        --is-surface-muted: #273548;
+        --is-surface-hover: #334155;
+        --is-border: #3f4c60;
+        --is-border-strong: #526176;
+        --is-text: #f8fafc;
+        --is-text-secondary: #d7dee8;
+        --is-text-muted: #aeb9c8;
+        --is-link: #72aee6;
+        --is-link-hover: #9ecbf0;
+        --is-focus: #72aee6;
+        --is-shadow: rgba(0, 0, 0, 0.35);
+        --is-input: #111827;
+        --is-disabled: #263244;
+        --is-success-bg: #173d2a;
+        --is-success-text: #9ee6b3;
+        --is-warning-bg: #493713;
+        --is-warning-text: #f8d57e;
+        --is-danger-bg: #4b2028;
+        --is-danger-text: #ffb4bd;
+        color-scheme: dark;
+    }
+
+    .intellisend-settings-wrap select,
+    .intellisend-providers-wrap select,
+    .intellisend-admin select {
+        background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg width='20' height='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 8l5 5 5-5' stroke='%23d7dee8' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+
+    .intellisend-admin .intellisend-modal {
+        background: rgba(2, 6, 23, 0.76);
+    }
+
+    .intellisend-providers-wrap .provider-info {
+        background: rgba(114, 174, 230, 0.12);
+    }
+
+    .intellisend-admin .intellisend-loading-overlay,
+    #page-loading-overlay {
+        background: rgba(17, 24, 39, 0.9);
+    }
+
+    .intellisend-admin .intellisend-table tbody tr,
+    .intellisend-admin .intellisend-table tbody td {
+        border-color: var(--is-border);
+    }
+
+    .intellisend-toast,
+    .intellisend-notification,
+    .intellisend-notice {
+        --is-toast-surface: #1f2937;
+        --is-toast-text: #f8fafc;
+        --is-toast-muted: #aeb9c8;
+        background: var(--is-toast-surface);
+        color: var(--is-toast-text);
+        border-color: #3f4c60;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+    }
+}
+
+/* ---------- extracted from settings-page.css ---------- */
+@media (prefers-color-scheme: dark) {
+    body:not([class*="admin-color-"]) #page-loading-overlay {
+        background: rgba(30, 30, 30, 0.9);
+    }
+    
+    body:not([class*="admin-color-"]) .test-result {
+        background: #2c3338;
+    }
+    
+    body:not([class*="admin-color-"]) .test-result.spam {
+        background: rgba(214, 54, 56, 0.1);
+    }
+    
+    body:not([class*="admin-color-"]) .test-result.not-spam {
+        background: rgba(70, 180, 80, 0.1);
+    }
+    
+    body:not([class*="admin-color-"]) .test-result.error {
+        background: rgba(214, 54, 56, 0.1);
+    }
+    
+    body:not([class*="admin-color-"]) .section-collapsed {
+        background-color: #23282d;
+    }
+}
+
+/* ---------- extracted from reports-page.css ---------- */
+@media (prefers-color-scheme: dark) {
+    body:not([class*="admin-color-"]) .intellisend-card {
+        background: #1f2937;
+        color: #f3f4f6;
+    }
+    
+    body:not([class*="admin-color-"]) .intellisend-card h2 {
+        color: #f3f4f6;
+    }
+    
+    body:not([class*="admin-color-"]) .intellisend-filters {
+        background: #374151;
+    }
+    
+    body:not([class*="admin-color-"]) .intellisend-table {
+        background: #1f2937;
+    }
+    
+    body:not([class*="admin-color-"]) .intellisend-table th {
+        background: #374151;
+        color: #f3f4f6;
+    }
+    
+    body:not([class*="admin-color-"]) .intellisend-table tr:hover {
+        background-color: #374151;
+    }
+    
+    body:not([class*="admin-color-"]) .intellisend-modal-content {
+        background: #1f2937;
+    }
+    
+    body:not([class*="admin-color-"]) .intellisend-modal-header {
+        background: #374151;
+    }
+    
+    body:not([class*="admin-color-"]) .report-message {
+        background: #374151;
+        color: #d1d5db;
+        border-color: #4b5563;
+    }
+}
+
+/* ---------- extracted from providers-page.css ---------- */
+@media (prefers-color-scheme: dark) {
+    .admin-color-modern .intellisend-providers-container {
+        background: #1f2329;
+    }
+    
+    .admin-color-modern .intellisend-providers-header {
+        background: linear-gradient(to right, #151a22, #1b2027);
+        border-color: #32373c;
+    }
+    
+    .admin-color-modern .provider-selector select,
+    .admin-color-modern .provider-field input,
+    .admin-color-modern .provider-field select {
+        background-color: #2c3338;
+        border-color: #3c434a;
+        color: #e2e4e7;
+    }
+    
+    .admin-color-modern .provider-info {
+        background: rgba(34, 113, 177, 0.1);
+        color: #a7aaad;
+    }
+    
+    .admin-color-modern .smtp-field {
+        background-color: #23282d;
+    }
+
+    .admin-color-modern .api-field {
+        background-color: #23282d;
+        border-left-color: #72aee6;
+    }
+
+    .admin-color-modern .provider-test-send {
+        border-bottom-color: #32373c;
+    }
+
+    .admin-color-modern .provider-test-send label {
+        color: #e2e4e7;
+    }
+
+    .admin-color-modern .provider-test-send .field-description {
+        color: #a7aaad;
+    }
+
+    .admin-color-modern .api-field .field-description,
+    .admin-color-modern .api-sender-hint {
+        color: #a7aaad;
+    }
+    
+    .admin-color-modern .intellisend-providers-footer {
+        background: #151a22;
+    }
+    
+    .admin-color-modern .provider-field label {
+        color: #e2e4e7;
+    }
+    
+    .admin-color-modern .credentials-section::before {
+        color: #a7aaad;
+    }
+}
+
+/* ---------- extracted from routing-page.css ---------- */
+@media (prefers-color-scheme: dark) {
+    .admin-color-modern .intellisend-card {
+        background: #1f2329;
+    }
+    
+    .admin-color-modern .intellisend-card h2,
+    .admin-color-modern .intellisend-table th {
+        background: #151a22;
+        border-color: #32373c;
+    }
+    
+    .admin-color-modern .intellisend-table td {
+        border-color: #32373c;
+    }
+    
+    .admin-color-modern .intellisend-table tr:hover {
+        background-color: #151a22;
+    }
+    
+    .admin-color-modern .intellisend-loading-overlay {
+        background: rgba(30, 30, 30, 0.7);
+    }
+    
+    .admin-color-modern input, 
+    .admin-color-modern select, 
+    .admin-color-modern textarea {
+        background-color: #32373c;
+        color: #f0f0f1;
+        border-color: #50575e;
+    }
+}
+
+/* ------------------------------------------------------------------ *
+ * The rules below were NOT inside a prefers-color-scheme query. They
+ * applied whenever the admin used one of the named WordPress colour
+ * schemes, and they out-specify the light tokens in theme.css, so an
+ * admin on the "Light" or "Modern" scheme got dark panels in light mode.
+ * They are part of the dark scheme and now load only with it.
+ * ------------------------------------------------------------------ */
+
+/* ---------- extracted from settings-page.css (WP admin colour schemes) ---------- */
+/* WordPress Theme Compatibility */
+.admin-color-light .intellisend-settings-container,
+.admin-color-modern .intellisend-settings-container,
+.admin-color-blue .intellisend-settings-container,
+.admin-color-coffee .intellisend-settings-container,
+.admin-color-ectoplasm .intellisend-settings-container,
+.admin-color-midnight .intellisend-settings-container,
+.admin-color-ocean .intellisend-settings-container,
+.admin-color-sunrise .intellisend-settings-container {
+    background: #1f2329;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.admin-color-midnight .intellisend-settings-section-title,
+.admin-color-modern .intellisend-settings-section-title {
+    color: #e2e4e7;
+}
+
+.admin-color-midnight .intellisend-settings-section,
+.admin-color-modern .intellisend-settings-section {
+    border-bottom-color: #32373c;
+}
+
+.admin-color-midnight .intellisend-settings-section:hover,
+.admin-color-modern .intellisend-settings-section:hover {
+    background-color: #23282d;
+}
+
+.admin-color-midnight .intellisend-settings-submit,
+.admin-color-modern .intellisend-settings-submit {
+    background: #151a22;
+    border-top-color: #32373c;
+}
+
+.admin-color-midnight .intellisend-settings-field label,
+.admin-color-modern .intellisend-settings-field label {
+    color: #e2e4e7;
+}
+
+.admin-color-midnight .intellisend-settings-field input,
+.admin-color-modern .intellisend-settings-field input,
+.admin-color-midnight .intellisend-settings-field select,
+.admin-color-modern .intellisend-settings-field select,
+.admin-color-midnight .intellisend-settings-field textarea,
+.admin-color-modern .intellisend-settings-field textarea {
+    background-color: #2c3338;
+    border-color: #3c434a;
+    color: #e2e4e7;
+}
+
+.admin-color-midnight .intellisend-settings-field input::placeholder,
+.admin-color-modern .intellisend-settings-field input::placeholder,
+.admin-color-midnight .intellisend-settings-field textarea::placeholder,
+.admin-color-modern .intellisend-settings-field textarea::placeholder {
+    color: #a7aaad;
+}
+
+.admin-color-midnight #page-loading-overlay,
+.admin-color-modern #page-loading-overlay {
+    background: rgba(30, 30, 30, 0.9);
+}
+
+.admin-color-midnight .section-collapsed,
+.admin-color-modern .section-collapsed {
+    background-color: #23282d;
+}
+
+
+/* ---------- extracted from reports-page.css (WP admin colour schemes) ---------- */
+/* WordPress Theme Compatibility */
+.admin-color-midnight .intellisend-card,
+.admin-color-modern .intellisend-card {
+    background: #1f2329;
+}
+
+.admin-color-midnight .intellisend-card h2,
+.admin-color-modern .intellisend-card h2 {
+    color: #e2e4e7;
+}
+
+.admin-color-midnight .intellisend-filters,
+.admin-color-modern .intellisend-filters {
+    background: #32373c;
+}
+
+.admin-color-midnight .intellisend-table,
+.admin-color-modern .intellisend-table {
+    background: #1f2329;
+}
+
+.admin-color-midnight .intellisend-table th,
+.admin-color-modern .intellisend-table th {
+    background: #32373c;
+    color: #e2e4e7;
+    border-color: #50575e;
+}
+
+.admin-color-midnight .intellisend-table td,
+.admin-color-modern .intellisend-table td {
+    border-color: #32373c;
+    color: #a7aaad;
+}
+
+.admin-color-midnight .intellisend-table tr:hover,
+.admin-color-modern .intellisend-table tr:hover {
+    background-color: #32373c;
+}
+
+.admin-color-midnight .intellisend-modal-content,
+.admin-color-modern .intellisend-modal-content {
+    background: #1f2329;
+}
+
+.admin-color-midnight .intellisend-modal-header,
+.admin-color-modern .intellisend-modal-header {
+    background: #32373c;
+    border-color: #50575e;
+}
+
+.admin-color-midnight .report-section h3,
+.admin-color-modern .report-section h3 {
+    color: #e2e4e7;
+}
+
+.admin-color-midnight .report-message,
+.admin-color-modern .report-message {
+    background: #32373c;
+    color: #a7aaad;
+    border-color: #50575e;
+}
+
+.admin-color-midnight .filter-item input,
+.admin-color-modern .filter-item input,
+.admin-color-midnight .filter-item select,
+.admin-color-modern .filter-item select {
+    background: #32373c;
+    border-color: #50575e;
+    color: #e2e4e7;
+}
+
+.admin-color-midnight .intellisend-pagination,
+.admin-color-modern .intellisend-pagination {
+    background: #32373c;
+    border-color: #50575e;
+}
+

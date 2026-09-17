@@ -252,7 +252,12 @@ function intellisend_render_reports_page_content() {
                                         <td>
                                             <button type="button" class="action-button view-report" data-id="<?php echo esc_attr( $report->id ); ?>" title="<?php echo esc_attr__( 'View Details', 'intellisend' ); ?>">
                                                 <span class="dashicons dashicons-visibility"></span>
+                                                <span class="screen-reader-text"><?php echo esc_html__( 'View details', 'intellisend' ); ?></span>
                                             </button>
+                                            <a class="action-button open-report" href="<?php echo esc_url( admin_url( 'admin.php?page=intellisend-reports&report=' . (int) $report->id ) ); ?>" title="<?php echo esc_attr__( 'Open on its own page', 'intellisend' ); ?>">
+                                                <span class="dashicons dashicons-external"></span>
+                                                <span class="screen-reader-text"><?php echo esc_html__( 'Open on its own page', 'intellisend' ); ?></span>
+                                            </a>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

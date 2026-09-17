@@ -819,122 +819,128 @@
     }
 }
 
-/* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-    body:not([class*="admin-color-"]) .intellisend-card {
-        background: #1f2937;
-        color: #f3f4f6;
+/* ------------------------------------------------------------------ *
+ * Single report page (admin.php?page=intellisend-reports&report=<id>)
+ * ------------------------------------------------------------------ */
+
+/* The list's action column now holds a button and a link side by side. */
+a.action-button {
+    text-decoration: none;
+}
+
+a.action-button:focus-visible,
+button.action-button:focus-visible {
+    outline: 2px solid var(--is-focus, #2271b1);
+    outline-offset: 1px;
+}
+
+.intellisend-report-title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.intellisend-report-id {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--is-text-muted, #646970);
+}
+
+.intellisend-report-back {
+    margin: 4px 0 16px;
+}
+
+.intellisend-report-back a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
+}
+
+.intellisend-report-back .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.intellisend-report-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.intellisend-report-meta {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.intellisend-report-meta th,
+.intellisend-report-meta td {
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--is-border, #dcdcde);
+}
+
+.intellisend-report-meta tr:last-child th,
+.intellisend-report-meta tr:last-child td {
+    border-bottom: 0;
+}
+
+.intellisend-report-meta th {
+    width: 200px;
+    font-weight: 600;
+    color: var(--is-text-secondary, #50575e);
+}
+
+.intellisend-report-meta td {
+    overflow-wrap: anywhere;
+}
+
+.intellisend-report-preview {
+    width: 100%;
+    min-height: 320px;
+    border: 1px solid var(--is-border, #dcdcde);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.intellisend-report-log {
+    margin: 0;
+    padding: 12px;
+    max-height: 420px;
+    overflow: auto;
+    border: 1px solid var(--is-border, #dcdcde);
+    border-radius: 6px;
+    background: var(--is-surface-muted, #f6f7f7);
+    color: var(--is-text, #1e1e1e);
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media screen and (max-width: 782px) {
+    .intellisend-report-meta th,
+    .intellisend-report-meta td {
+        display: block;
+        width: auto;
+        padding: 6px 0;
+        border-bottom: 0;
     }
-    
-    body:not([class*="admin-color-"]) .intellisend-card h2 {
-        color: #f3f4f6;
+
+    .intellisend-report-meta th {
+        padding-top: 12px;
     }
-    
-    body:not([class*="admin-color-"]) .intellisend-filters {
-        background: #374151;
+
+    .intellisend-report-meta tr {
+        display: block;
+        border-bottom: 1px solid var(--is-border, #dcdcde);
     }
-    
-    body:not([class*="admin-color-"]) .intellisend-table {
-        background: #1f2937;
+
+    .intellisend-report-preview {
+        min-height: 240px;
     }
-    
-    body:not([class*="admin-color-"]) .intellisend-table th {
-        background: #374151;
-        color: #f3f4f6;
-    }
-    
-    body:not([class*="admin-color-"]) .intellisend-table tr:hover {
-        background-color: #374151;
-    }
-    
-    body:not([class*="admin-color-"]) .intellisend-modal-content {
-        background: #1f2937;
-    }
-    
-    body:not([class*="admin-color-"]) .intellisend-modal-header {
-        background: #374151;
-    }
-    
-    body:not([class*="admin-color-"]) .report-message {
-        background: #374151;
-        color: #d1d5db;
-        border-color: #4b5563;
-    }
-}
-
-/* WordPress Theme Compatibility */
-.admin-color-midnight .intellisend-card,
-.admin-color-modern .intellisend-card {
-    background: #1f2329;
-}
-
-.admin-color-midnight .intellisend-card h2,
-.admin-color-modern .intellisend-card h2 {
-    color: #e2e4e7;
-}
-
-.admin-color-midnight .intellisend-filters,
-.admin-color-modern .intellisend-filters {
-    background: #32373c;
-}
-
-.admin-color-midnight .intellisend-table,
-.admin-color-modern .intellisend-table {
-    background: #1f2329;
-}
-
-.admin-color-midnight .intellisend-table th,
-.admin-color-modern .intellisend-table th {
-    background: #32373c;
-    color: #e2e4e7;
-    border-color: #50575e;
-}
-
-.admin-color-midnight .intellisend-table td,
-.admin-color-modern .intellisend-table td {
-    border-color: #32373c;
-    color: #a7aaad;
-}
-
-.admin-color-midnight .intellisend-table tr:hover,
-.admin-color-modern .intellisend-table tr:hover {
-    background-color: #32373c;
-}
-
-.admin-color-midnight .intellisend-modal-content,
-.admin-color-modern .intellisend-modal-content {
-    background: #1f2329;
-}
-
-.admin-color-midnight .intellisend-modal-header,
-.admin-color-modern .intellisend-modal-header {
-    background: #32373c;
-    border-color: #50575e;
-}
-
-.admin-color-midnight .report-section h3,
-.admin-color-modern .report-section h3 {
-    color: #e2e4e7;
-}
-
-.admin-color-midnight .report-message,
-.admin-color-modern .report-message {
-    background: #32373c;
-    color: #a7aaad;
-    border-color: #50575e;
-}
-
-.admin-color-midnight .filter-item input,
-.admin-color-modern .filter-item input,
-.admin-color-midnight .filter-item select,
-.admin-color-modern .filter-item select {
-    background: #32373c;
-    border-color: #50575e;
-    color: #e2e4e7;
-}
-
-.admin-color-midnight .intellisend-pagination,
-.admin-color-modern .intellisend-pagination {
-    background: #32373c;
-    border-color: #50575e;
 }

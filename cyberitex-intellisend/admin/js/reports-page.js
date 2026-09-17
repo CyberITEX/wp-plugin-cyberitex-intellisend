@@ -481,7 +481,9 @@
                     }
                 });
             });
-            preview.srcdoc = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:"><style>html{color-scheme:light dark}body{margin:8px;background:#fff;color:#1e1e1e;font:14px/1.5 sans-serif;overflow-wrap:anywhere;white-space:pre-wrap}img{max-width:100%;height:auto}table{max-width:100%}@media(prefers-color-scheme:dark){body{background:#111827;color:#f8fafc}}</style></head><body>' + parsed.body.innerHTML + '</body></html>';
+            // The preview stays light like the rest of IntelliSend, so it does
+            // not flip to dark on its own when the desktop prefers dark.
+            preview.srcdoc = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:"><style>html{color-scheme:light}body{margin:8px;background:#fff;color:#1e1e1e;font:14px/1.5 sans-serif;overflow-wrap:anywhere;white-space:pre-wrap}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>' + parsed.body.innerHTML + '</body></html>';
             $container.append(preview).append($('<p class="description"></p>').text('Remote images and links are disabled in this preview.'));
         },
 
@@ -668,18 +670,6 @@
                 .intellisend-tooltip:hover .tooltip-text {
                     visibility: visible;
                     opacity: 1;
-                }
-                
-                /* Dark mode adjustments */
-                @media (prefers-color-scheme: dark) {
-                    .admin-color-modern .intellisend-modal.loading .intellisend-modal-body:after {
-                        background: rgba(30, 30, 30, 0.7);
-                    }
-                    
-                    .admin-color-modern .intellisend-modal.loading .intellisend-modal-body:before {
-                        border-color: rgba(255, 255, 255, 0.1);
-                        border-top-color: #2271b1;
-                    }
                 }
             `;
             

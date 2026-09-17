@@ -152,6 +152,21 @@ class IntelliSend_Admin
 
     public static function render_reports_page()
     {
+        // admin.php?page=intellisend-reports&report=<id> shows one report on its
+        // own page. WordPress resolves ?page= against a registered menu slug, so
+        // the id travels as a separate argument rather than as a path segment.
+        $report_id = isset($_GET['report']) && is_string($_GET['report']) && ctype_digit($_GET['report'])
+            ? (int) $_GET['report']
+            : 0;
+
+        if ($report_id > 0) {
+            require_once INTELLISEND_PLUGIN_DIR . 'admin/views/report-single.php';
+            if (function_exists('intellisend_render_single_report_content')) {
+                intellisend_render_single_report_content($report_id);
+            }
+            return;
+        }
+
         require_once INTELLISEND_PLUGIN_DIR . 'admin/views/reports-page.php';
         if (function_exists('intellisend_render_reports_page_content')) {
             intellisend_render_reports_page_content();
@@ -319,8 +334,8 @@ class IntelliSend_Admin
                 );
             }
 
-            // Load theme tokens after page styles so light and dark modes are
-            // consistent across every IntelliSend screen.
+            // Load theme tokens after page styles so colours are consistent
+            // across every IntelliSend screen.
             wp_enqueue_style(
                 'intellisend-theme-style',
                 INTELLISEND_PLUGIN_URL . 'admin/css/theme.css',
@@ -328,6 +343,24 @@ class IntelliSend_Admin
                 INTELLISEND_VERSION,
                 'all'
             );
+
+            // IntelliSend renders light on every screen by default, whatever the
+            // operating system or WordPress admin colour scheme says. Sites that
+            // want the dark scheme back opt in:
+            //
+            //     add_filter( 'intellisend_enable_dark_mode', '__return_true' );
+            //
+            // The dark sheet still honours prefers-color-scheme, so opting in
+            // means "follow the operating system", not "always dark".
+            if (apply_filters('intellisend_enable_dark_mode', false)) {
+                wp_enqueue_style(
+                    'intellisend-theme-dark-style',
+                    INTELLISEND_PLUGIN_URL . 'admin/css/theme-dark.css',
+                    array('intellisend-theme-style'),
+                    INTELLISEND_VERSION,
+                    'all'
+                );
+            }
         }
     }
 

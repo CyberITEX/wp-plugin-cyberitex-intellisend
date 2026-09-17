@@ -64,13 +64,17 @@ const IntelliSendToast = (function($) {
                     left: 16px;
                 }
                 
+                /* Each toast type carries a solid background and white text.
+                   The type colour is the whole surface, so the old 4px accent
+                   bar is gone and the icon sits in a translucent white disc. */
                 .intellisend-toast {
                     position: relative;
                     padding: 14px 16px;
                     border-radius: 8px;
-                    background: var(--wp-admin-theme-color-darker-10, #ffffff);
-                    border: 1px solid var(--wp-admin-border-color, #e1e1e1);
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.1);
+                    background: #2271b1;
+                    color: #ffffff;
+                    border: 1px solid transparent;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.2);
                     display: flex;
                     align-items: flex-start;
                     transform: translateY(16px);
@@ -84,28 +88,17 @@ const IntelliSendToast = (function($) {
                     opacity: 1;
                 }
                 
-                .intellisend-toast::before {
-                    content: '';
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    height: 100%;
-                    width: 4px;
+                /* Greens light enough to read as "success" on a white page are
+                   too light behind white text: #16a34a gives 3.3:1. These are
+                   the darkest shades that still read green/red and clear the
+                   4.5:1 AA floor (5.0:1 and 4.8:1). */
+                .intellisend-toast.success,
+                .intellisend-toast.not-spam {
+                    background: #15803d;
                 }
                 
-                .intellisend-toast.success::before {
-                    background: #16a34a;
-                }
-                
-                .intellisend-toast.spam::before {
-                    background: #dc2626;
-                }
-                
-                .intellisend-toast.not-spam::before {
-                    background: #16a34a;
-                }
-                
-                .intellisend-toast.error::before {
+                .intellisend-toast.error,
+                .intellisend-toast.spam {
                     background: #dc2626;
                 }
                 
@@ -118,26 +111,8 @@ const IntelliSendToast = (function($) {
                     margin-right: 12px;
                     border-radius: 50%;
                     flex-shrink: 0;
-                }
-                
-                .intellisend-toast.success .toast-icon {
-                    background: rgba(22, 163, 74, 0.15);
-                    color: #16a34a;
-                }
-                
-                .intellisend-toast.spam .toast-icon {
-                    background: rgba(220, 38, 38, 0.15);
-                    color: #dc2626;
-                }
-                
-                .intellisend-toast.not-spam .toast-icon {
-                    background: rgba(22, 163, 74, 0.15);
-                    color: #16a34a;
-                }
-                
-                .intellisend-toast.error .toast-icon {
-                    background: rgba(220, 38, 38, 0.15);
-                    color: #dc2626;
+                    background: rgba(255, 255, 255, 0.2);
+                    color: #ffffff;
                 }
                 
                 .intellisend-toast .dashicons {
@@ -158,18 +133,27 @@ const IntelliSendToast = (function($) {
                     font-size: 14px;
                     line-height: 1.3;
                     margin-bottom: 2px;
-                    color: var(--wp-admin-theme-color, #1e1e1e);
+                    color: #ffffff;
                 }
                 
                 .intellisend-toast .toast-message {
                     font-size: 13px;
-                    color: var(--wp-admin-theme-color-darker-20, #4b5563);
+                    color: #ffffff;
                     line-height: 1.4;
+                }
+                
+                /* spamResult() shows a verdict in the title and passes no body,
+                   so the empty element must not reserve a line of its own. */
+                .intellisend-toast .toast-message:empty {
+                    display: none;
                 }
                 
                 .intellisend-toast .toast-close {
                     cursor: pointer;
-                    color: var(--wp-admin-theme-color-darker-10, #9ca3af);
+                    color: #ffffff;
+                    background: transparent;
+                    border: 0;
+                    padding: 0;
                     margin-left: 12px;
                     font-size: 16px;
                     line-height: 1;
@@ -181,281 +165,17 @@ const IntelliSendToast = (function($) {
                 
                 .intellisend-toast .toast-close:hover {
                     opacity: 1;
-                    color: var(--wp-admin-theme-color, #1e1e1e);
+                    color: #ffffff;
                 }
                 
-                /* WordPress Light Theme */
-                body.admin-color-light .intellisend-toast {
-                    background: #ffffff;
-                    border-color: #e1e1e1;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.1);
+                /* The shared admin focus ring is #2271b1, which all but vanishes
+                   on a red toast. On a coloured surface the ring must be white. */
+                .intellisend-toast .toast-close:focus-visible {
+                    outline: 2px solid #ffffff;
+                    outline-offset: 2px;
+                    opacity: 1;
                 }
-                
-                body.admin-color-light .intellisend-toast .toast-title {
-                    color: #1e1e1e;
-                }
-                
-                body.admin-color-light .intellisend-toast .toast-message {
-                    color: #4b5563;
-                }
-                
-                body.admin-color-light .intellisend-toast .toast-close {
-                    color: #9ca3af;
-                }
-                
-                /* WordPress Blue Theme */
-                body.admin-color-blue .intellisend-toast {
-                    background: #f8f9fa;
-                    border-color: #d1d5db;
-                }
-                
-                body.admin-color-blue .intellisend-toast .toast-title {
-                    color: #1f2937;
-                }
-                
-                body.admin-color-blue .intellisend-toast .toast-message {
-                    color: #4b5563;
-                }
-                
-                /* WordPress Coffee Theme */
-                body.admin-color-coffee .intellisend-toast {
-                    background: #f7f6f4;
-                    border-color: #d4cfc7;
-                }
-                
-                body.admin-color-coffee .intellisend-toast .toast-title {
-                    color: #3c2415;
-                }
-                
-                body.admin-color-coffee .intellisend-toast .toast-message {
-                    color: #59524a;
-                }
-                
-                /* WordPress Ectoplasm Theme */
-                body.admin-color-ectoplasm .intellisend-toast {
-                    background: #f4f6f8;
-                    border-color: #d3d7dc;
-                }
-                
-                body.admin-color-ectoplasm .intellisend-toast .toast-title {
-                    color: #2c3338;
-                }
-                
-                body.admin-color-ectoplasm .intellisend-toast .toast-message {
-                    color: #50575e;
-                }
-                
-                /* WordPress Midnight Theme */
-                body.admin-color-midnight .intellisend-toast {
-                    background: #2c3338;
-                    border-color: #50575e;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.3);
-                }
-                
-                body.admin-color-midnight .intellisend-toast .toast-title {
-                    color: #f0f0f1;
-                }
-                
-                body.admin-color-midnight .intellisend-toast .toast-message {
-                    color: #c3c4c7;
-                }
-                
-                body.admin-color-midnight .intellisend-toast .toast-close {
-                    color: #8c8f94;
-                }
-                
-                body.admin-color-midnight .intellisend-toast .toast-close:hover {
-                    color: #f0f0f1;
-                }
-                
-                body.admin-color-midnight .intellisend-toast.success .toast-icon {
-                    background: rgba(22, 163, 74, 0.25);
-                }
-                
-                body.admin-color-midnight .intellisend-toast.spam .toast-icon {
-                    background: rgba(220, 38, 38, 0.25);
-                }
-                
-                body.admin-color-midnight .intellisend-toast.not-spam .toast-icon {
-                    background: rgba(22, 163, 74, 0.25);
-                }
-                
-                body.admin-color-midnight .intellisend-toast.error .toast-icon {
-                    background: rgba(220, 38, 38, 0.25);
-                }
-                
-                /* WordPress Ocean Theme */
-                body.admin-color-ocean .intellisend-toast {
-                    background: #f4f7f9;
-                    border-color: #cfd8dc;
-                }
-                
-                body.admin-color-ocean .intellisend-toast .toast-title {
-                    color: #263238;
-                }
-                
-                body.admin-color-ocean .intellisend-toast .toast-message {
-                    color: #546e7a;
-                }
-                
-                /* WordPress Sunrise Theme */
-                body.admin-color-sunrise .intellisend-toast {
-                    background: #fdf8f5;
-                    border-color: #f4e4d6;
-                }
-                
-                body.admin-color-sunrise .intellisend-toast .toast-title {
-                    color: #3e2723;
-                }
-                
-                body.admin-color-sunrise .intellisend-toast .toast-message {
-                    color: #5d4037;
-                }
-                
-                /* WordPress Fresh Theme */
-                body.admin-color-fresh .intellisend-toast {
-                    background: #f1f8e9;
-                    border-color: #c8e6c9;
-                }
-                
-                body.admin-color-fresh .intellisend-toast .toast-title {
-                    color: #1b5e20;
-                }
-                
-                body.admin-color-fresh .intellisend-toast .toast-message {
-                    color: #2e7d32;
-                }
-                
-                /* Modern Theme */
-                body.admin-color-modern .intellisend-toast {
-                    background: #1f2329;
-                    border-color: #32373c;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.3);
-                }
-                
-                body.admin-color-modern .intellisend-toast .toast-title {
-                    color: #e2e4e7;
-                }
-                
-                body.admin-color-modern .intellisend-toast .toast-message {
-                    color: #a7aaad;
-                }
-                
-                body.admin-color-modern .intellisend-toast .toast-close {
-                    color: #72777c;
-                }
-                
-                body.admin-color-modern .intellisend-toast .toast-close:hover {
-                    color: #e2e4e7;
-                }
-                
-                body.admin-color-modern .intellisend-toast.success .toast-icon {
-                    background: rgba(22, 163, 74, 0.25);
-                }
-                
-                body.admin-color-modern .intellisend-toast.spam .toast-icon {
-                    background: rgba(220, 38, 38, 0.25);
-                }
-                
-                body.admin-color-modern .intellisend-toast.not-spam .toast-icon {
-                    background: rgba(22, 163, 74, 0.25);
-                }
-                
-                body.admin-color-modern .intellisend-toast.error .toast-icon {
-                    background: rgba(220, 38, 38, 0.25);
-                }
-                
-                /* System Dark Mode Detection */
-                @media (prefers-color-scheme: dark) {
-                    body:not([class*="admin-color-"]) .intellisend-toast {
-                        background: #1f2937;
-                        border-color: #374151;
-                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.3);
-                    }
-                    
-                    body:not([class*="admin-color-"]) .intellisend-toast .toast-title {
-                        color: #f3f4f6;
-                    }
-                    
-                    body:not([class*="admin-color-"]) .intellisend-toast .toast-message {
-                        color: #d1d5db;
-                    }
-                    
-                    body:not([class*="admin-color-"]) .intellisend-toast .toast-close {
-                        color: #9ca3af;
-                    }
-                    
-                    body:not([class*="admin-color-"]) .intellisend-toast .toast-close:hover {
-                        color: #f3f4f6;
-                    }
-                    
-                    body:not([class*="admin-color-"]) .intellisend-toast.success .toast-icon {
-                        background: rgba(22, 163, 74, 0.25);
-                    }
-                    
-                    body:not([class*="admin-color-"]) .intellisend-toast.spam .toast-icon {
-                        background: rgba(220, 38, 38, 0.25);
-                    }
-                    
-                    body:not([class*="admin-color-"]) .intellisend-toast.not-spam .toast-icon {
-                        background: rgba(22, 163, 74, 0.25);
-                    }
-                    
-                    body:not([class*="admin-color-"]) .intellisend-toast.error .toast-icon {
-                        background: rgba(220, 38, 38, 0.25);
-                    }
-                }
-                
-                /* High contrast mode support */
-                @media (prefers-contrast: high) {
-                    .intellisend-toast {
-                        border-width: 2px;
-                        border-style: solid;
-                    }
-                    
-                    .intellisend-toast .toast-title {
-                        font-weight: 700;
-                    }
-                    
-                    .intellisend-toast .toast-icon {
-                        border: 2px solid currentColor;
-                    }
-                }
-                
-                /* Reduced motion support */
-                @media (prefers-reduced-motion: reduce) {
-                    .intellisend-toast {
-                        transition: opacity 0.1s ease;
-                        transform: none;
-                    }
-                    
-                    .intellisend-toast.show {
-                        transform: none;
-                    }
-                }
-                
-                /* Mobile responsive adjustments */
-                @media screen and (max-width: 480px) {
-                    #${TOAST_CONTAINER_ID} {
-                        left: 8px;
-                        right: 8px;
-                        width: auto;
-                        max-width: none;
-                    }
-                    
-                    .intellisend-toast {
-                        padding: 12px 14px;
-                    }
-                    
-                    .intellisend-toast .toast-title {
-                        font-size: 13px;
-                    }
-                    
-                    .intellisend-toast .toast-message {
-                        font-size: 12px;
-                    }
-                }
-            `;
+                `;
             
             $('<style>').text(css).appendTo('head');
         }

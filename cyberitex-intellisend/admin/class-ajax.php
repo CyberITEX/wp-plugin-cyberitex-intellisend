@@ -326,7 +326,7 @@ class IntelliSend_Ajax
 
         // Process and save only anti-spam settings
         $settings = array(
-            'antiSpamEndPoint'     => isset($_POST['antiSpamEndPoint']) ? esc_url_raw(self::post_string('antiSpamEndPoint')) : 'https://api.cyberitex.com/v1/tools/SpamCheck',
+            'antiSpamEndPoint'     => isset($_POST['antiSpamEndPoint']) ? esc_url_raw(self::post_string('antiSpamEndPoint')) : 'https://api.cyberitex.com/v1/tools/spamCheck',
         );
 
         // Only update API key if a new one is provided

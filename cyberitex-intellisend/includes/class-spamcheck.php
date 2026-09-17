@@ -44,7 +44,7 @@ final class IntelliSend_SpamCheck {
         }
         
         // Prepare the API request
-        $api_url = !empty($endpoint_override) ? $endpoint_override : (!empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/tools/SpamCheck');
+        $api_url = !empty($endpoint_override) ? $endpoint_override : (!empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/tools/spamCheck');
         
         $args = array(
             'method'  => 'POST',
@@ -149,7 +149,7 @@ final class IntelliSend_SpamCheck {
         }
         
         // Prepare the API request
-        $api_url = !empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/tools/SpamCheck';
+        $api_url = !empty($settings->antiSpamEndPoint) ? $settings->antiSpamEndPoint : 'https://api.cyberitex.com/v1/tools/spamCheck';
         
         $args = array(
             'method'  => 'POST',

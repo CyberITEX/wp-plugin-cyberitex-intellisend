@@ -9,8 +9,14 @@ Current spam handling forwards flagged messages to the hard-coded external addre
 
 ## Features
 
-- **Responsive light and dark modes**
-  All IntelliSend admin screens adapt to narrow displays and automatically follow the operating-system colour preference. Form controls, tables, dialogs, notices and message previews share the same accessible palette.
+- **Responsive light interface**
+  All IntelliSend admin screens adapt to narrow displays and render light, whatever the operating-system colour preference or the selected WordPress admin colour scheme. Form controls, tables, dialogs, notices and message previews share the same accessible palette.
+
+  A site that wants the dark scheme can opt in, which loads `admin/css/theme-dark.css` and follows the operating-system preference from then on:
+
+  ```php
+  add_filter( 'intellisend_enable_dark_mode', '__return_true' );
+  ```
 
 - **SMTP Configuration**
   Enter your mail server, port, username, and password in a dedicated settings page for reliable email sending.
@@ -69,6 +75,7 @@ Current spam handling forwards flagged messages to the hard-coded external addre
   - **Sortable columns** (date, recipient, subject, status)
     - **Pagination** (20 reports per page)
     - **View Details** dialog with an isolated formatted preview; remote images and links are disabled
+    - **Single report page** at `admin.php?page=intellisend-reports&report=<id>`, opened from the arrow icon next to View Details. Same isolated preview, plus delivery metadata, the routing rule that matched and the diagnostic log — on a URL you can bookmark, reload or send to another administrator.
   - **Clear All Logs** option
 
 - **Test Email & Spam Test**

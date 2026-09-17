@@ -500,37 +500,6 @@
 }
 
 /* Dark mode compatibility */
-@media (prefers-color-scheme: dark) {
-    .admin-color-modern .intellisend-card {
-        background: #1f2329;
-    }
-    
-    .admin-color-modern .intellisend-card h2,
-    .admin-color-modern .intellisend-table th {
-        background: #151a22;
-        border-color: #32373c;
-    }
-    
-    .admin-color-modern .intellisend-table td {
-        border-color: #32373c;
-    }
-    
-    .admin-color-modern .intellisend-table tr:hover {
-        background-color: #151a22;
-    }
-    
-    .admin-color-modern .intellisend-loading-overlay {
-        background: rgba(30, 30, 30, 0.7);
-    }
-    
-    .admin-color-modern input, 
-    .admin-color-modern select, 
-    .admin-color-modern textarea {
-        background-color: #32373c;
-        color: #f0f0f1;
-        border-color: #50575e;
-    }
-}
 
 
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.3.0] - 2026-09-17
+
+### Changed
+- Spam checks now call `POST /v1/tools/spamCheck` instead of `/v1/tools/SpamCheck`. The capital-S route runs the retired v1 classifier, whose verdict depends on Redis burst counters and a cross-site reputation store shared by every calling site, and which forwards nearly every message to the language model. The lowercase route is a pure function of the message text, consults the model only for an ambiguous middle band, and returns `score`, `reasons`, `model` and `version` alongside `isSpam`. Sites with a custom endpoint saved in Settings are unaffected; update it by hand to pick up the change.
+- IntelliSend admin screens are now light on every screen, regardless of the operating system preference or the selected WordPress admin colour scheme.
+
+### Added
+- A permalinked page for a single report at `admin.php?page=intellisend-reports&report=<id>`, reachable from a new icon in the reports list beside the existing dialog. It shows delivery metadata, the resolved routing rule name, an isolated message preview and the diagnostic log, and it can be bookmarked, reloaded and shared.
+- An opt-in filter that restores the dark colour scheme:
+
+      add_filter( 'intellisend_enable_dark_mode', '__return_true' );
+
+  The dark stylesheet still follows `prefers-color-scheme`, so opting in means "follow the operating system" rather than "always dark".
+
+### Fixed
+- Panels, tables, inputs and toasts no longer render dark for administrators using the Light, Modern or Midnight WordPress admin colour schemes. Those rules sat outside any `prefers-color-scheme` query and out-specified the light tokens in `theme.css`, so choosing the "Light" scheme produced dark IntelliSend panels.
+- The report message preview no longer switches to a dark background on its own when the desktop prefers dark.
+- Toast notifications are readable again. The base `.intellisend-toast` rule took both its background and its text colour from `--wp-admin-theme-color-darker-10` / `--wp-admin-theme-color-darker-20`, so a toast rendered as the admin accent colour on itself; the intended `#ffffff` and `#1e1e1e` were only unreachable `var()` fallbacks. Per-scheme overrides had masked this on every colour scheme. The base rule now carries the flat values and the per-scheme tinting is gone, so a toast looks the same on every admin colour scheme.
+- A toast with a title and no body (the spam-test verdict) no longer reserves an empty line beneath the title.
+- Toasts now carry a solid background per type with white text: green for success and a clean spam verdict, red for errors and a spam verdict, WordPress blue otherwise. The success green was darkened from `#16a34a` to `#15803d` because white on the lighter green measured 3.3:1, below the 4.5:1 AA floor; the palette now measures 5.0:1, 4.8:1 and 5.2:1. The 4px left accent bar is gone, since the surface itself now carries the type, and the icon sits in a translucent white disc. `theme.css` no longer sets toast colours, so a single component owns them.
+- The dismiss control on a toast takes a white focus ring instead of the shared `#2271b1` admin ring, which was nearly invisible on a red toast.
+
 ## [1.2.2] - 2026-09-17
 
 ### Added
