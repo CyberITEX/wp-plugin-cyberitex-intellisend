@@ -5,7 +5,7 @@ Tags: spam, contact form, security, smtp, email, spam checker
 Requires at least: 5.7
 Tested up to: 6.7
 Requires PHP: 7.0
-Stable tag: 1.2.1
+Stable tag: 1.2.2
 License: GPL v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,8 @@ IntelliSend routes WordPress email through SMTP or provider APIs, applies option
 6. **Provides Reports** with filters, sorting, pagination and an accessible details dialog with an isolated message preview.
 
 ### Key Features
+
+- **Responsive Light and Dark Modes**: Every IntelliSend admin screen adapts to desktop and mobile layouts and automatically follows the operating-system colour preference.
 - **Custom SMTP**: Use your own SMTP credentials to ensure deliverability.
 - **SpamCheck API**: Leverage robust spam detection.
 - **Spam Handling**: Flagged messages are forwarded externally; see AUDIT.md for the privacy review and outstanding policy decision.

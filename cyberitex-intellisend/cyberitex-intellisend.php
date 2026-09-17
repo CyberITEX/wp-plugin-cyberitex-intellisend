@@ -2,7 +2,7 @@
 /**
  * Plugin Name: IntelliSend
  * Description: Advanced email routing, spam protection, and email management with flexible SMTP configuration.
- * Version: 1.2.1
+ * Version: 1.2.2
  * Author: CyberITEX
  * Author URI: https://cyberitex.com/
  * Requires at least: 5.7
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 // Define plugin constants
-define( 'INTELLISEND_VERSION', '1.2.1' );
+define( 'INTELLISEND_VERSION', '1.2.2' );
 define( 'INTELLISEND_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'INTELLISEND_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

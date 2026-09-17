@@ -9,6 +9,9 @@ Current spam handling forwards flagged messages to the hard-coded external addre
 
 ## Features
 
+- **Responsive light and dark modes**
+  All IntelliSend admin screens adapt to narrow displays and automatically follow the operating-system colour preference. Form controls, tables, dialogs, notices and message previews share the same accessible palette.
+
 - **SMTP Configuration**
   Enter your mail server, port, username, and password in a dedicated settings page for reliable email sending.
 

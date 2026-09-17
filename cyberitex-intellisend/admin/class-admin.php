@@ -318,6 +318,16 @@ class IntelliSend_Admin
                     )
                 );
             }
+
+            // Load theme tokens after page styles so light and dark modes are
+            // consistent across every IntelliSend screen.
+            wp_enqueue_style(
+                'intellisend-theme-style',
+                INTELLISEND_PLUGIN_URL . 'admin/css/theme.css',
+                array('intellisend-admin-style'),
+                INTELLISEND_VERSION,
+                'all'
+            );
         }
     }
 

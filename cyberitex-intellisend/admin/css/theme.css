@@ -1,0 +1,518 @@
+/**
+ * IntelliSend light and dark colour system.
+ *
+ * Page-specific styles own layout. This file loads last and owns colours so
+ * all four screens follow the same system preference without depending on a
+ * particular WordPress admin colour scheme.
+ */
+
+.toplevel_page_intellisend,
+.intellisend_page_intellisend-providers,
+.intellisend_page_intellisend-routing,
+.intellisend_page_intellisend-reports,
+.intellisend-settings-wrap,
+.intellisend-providers-wrap,
+.intellisend-admin {
+    --is-page: #f0f0f1;
+    --is-surface: #ffffff;
+    --is-surface-raised: #ffffff;
+    --is-surface-muted: #f6f7f7;
+    --is-surface-hover: #f0f0f1;
+    --is-border: #dcdcde;
+    --is-border-strong: #c3c4c7;
+    --is-text: #1e1e1e;
+    --is-text-secondary: #50575e;
+    --is-text-muted: #646970;
+    --is-link: #2271b1;
+    --is-link-hover: #135e96;
+    --is-focus: #2271b1;
+    --is-shadow: rgba(0, 0, 0, 0.08);
+    --is-input: #ffffff;
+    --is-disabled: #f0f0f1;
+    --is-success-bg: #edfaef;
+    --is-success-text: #155724;
+    --is-warning-bg: #fff8e5;
+    --is-warning-text: #7a4f01;
+    --is-danger-bg: #fcf0f1;
+    --is-danger-text: #8a2424;
+    color: var(--is-text);
+    color-scheme: light;
+}
+
+/* Shared surfaces and text. */
+.intellisend-settings-wrap h1,
+.intellisend-providers-wrap h1,
+.intellisend-admin h1,
+.intellisend-settings-wrap h2,
+.intellisend-providers-wrap h2,
+.intellisend-admin h2,
+.intellisend-settings-wrap h3,
+.intellisend-providers-wrap h3,
+.intellisend-admin h3,
+.intellisend-settings-wrap label,
+.intellisend-providers-wrap label,
+.intellisend-admin label {
+    color: var(--is-text);
+}
+
+.intellisend-settings-wrap a,
+.intellisend-providers-wrap a,
+.intellisend-admin a {
+    color: var(--is-link);
+}
+
+.intellisend-settings-wrap a:hover,
+.intellisend-providers-wrap a:hover,
+.intellisend-admin a:hover {
+    color: var(--is-link-hover);
+}
+
+.intellisend-settings-container,
+.intellisend-providers-container,
+.intellisend-admin .intellisend-card,
+.intellisend-admin .intellisend-modal-content {
+    background: var(--is-surface);
+    color: var(--is-text);
+    border-color: var(--is-border);
+    box-shadow: 0 4px 16px var(--is-shadow);
+}
+
+.intellisend-settings-wrap input,
+.intellisend-settings-wrap select,
+.intellisend-settings-wrap textarea,
+.intellisend-providers-wrap input,
+.intellisend-providers-wrap select,
+.intellisend-providers-wrap textarea,
+.intellisend-admin input,
+.intellisend-admin select,
+.intellisend-admin textarea {
+    background-color: var(--is-input);
+    border-color: var(--is-border-strong);
+    color: var(--is-text);
+}
+
+/* Match the specificity of the page styles so WordPress colour schemes do
+ * not leave individual controls on the opposite theme. */
+.intellisend-settings-wrap .intellisend-settings-field input,
+.intellisend-settings-wrap .intellisend-settings-field select,
+.intellisend-settings-wrap .intellisend-settings-field textarea,
+.intellisend-providers-wrap .provider-field input,
+.intellisend-providers-wrap .provider-field select,
+.intellisend-providers-wrap .provider-field textarea,
+.intellisend-admin .filter-item input,
+.intellisend-admin .filter-item select,
+.intellisend-admin .intellisend-table input,
+.intellisend-admin .intellisend-table select,
+.intellisend-admin .intellisend-table textarea {
+    background-color: var(--is-input);
+    border-color: var(--is-border-strong);
+    color: var(--is-text);
+}
+
+.intellisend-settings-wrap input::placeholder,
+.intellisend-settings-wrap textarea::placeholder,
+.intellisend-providers-wrap input::placeholder,
+.intellisend-providers-wrap textarea::placeholder,
+.intellisend-admin input::placeholder,
+.intellisend-admin textarea::placeholder {
+    color: var(--is-text-muted);
+    opacity: 1;
+}
+
+.intellisend-settings-wrap input:disabled,
+.intellisend-settings-wrap select:disabled,
+.intellisend-settings-wrap textarea:disabled,
+.intellisend-providers-wrap input:disabled,
+.intellisend-providers-wrap select:disabled,
+.intellisend-providers-wrap textarea:disabled,
+.intellisend-admin input:disabled,
+.intellisend-admin select:disabled,
+.intellisend-admin textarea:disabled {
+    background-color: var(--is-disabled);
+    color: var(--is-text-muted);
+}
+
+.intellisend-settings-wrap input:focus,
+.intellisend-settings-wrap select:focus,
+.intellisend-settings-wrap textarea:focus,
+.intellisend-providers-wrap input:focus,
+.intellisend-providers-wrap select:focus,
+.intellisend-providers-wrap textarea:focus,
+.intellisend-admin input:focus,
+.intellisend-admin select:focus,
+.intellisend-admin textarea:focus {
+    border-color: var(--is-focus);
+    box-shadow: 0 0 0 1px var(--is-focus);
+}
+
+.intellisend-settings-wrap .button-secondary,
+.intellisend-providers-wrap .button-secondary,
+.intellisend-admin .button-secondary,
+.intellisend-admin .button:not(.button-primary):not(.button-link-delete) {
+    background: var(--is-surface-muted);
+    border-color: var(--is-border-strong);
+    color: var(--is-text-secondary);
+}
+
+.intellisend-settings-wrap .button-secondary:hover,
+.intellisend-providers-wrap .button-secondary:hover,
+.intellisend-admin .button-secondary:hover,
+.intellisend-admin .button:not(.button-primary):not(.button-link-delete):hover {
+    background: var(--is-surface-hover);
+    border-color: var(--is-text-muted);
+    color: var(--is-text);
+}
+
+.intellisend-settings-wrap .field-description,
+.intellisend-settings-wrap .description,
+.intellisend-settings-wrap .api-key-info,
+.intellisend-providers-wrap .field-description,
+.intellisend-providers-wrap .api-sender-hint,
+.intellisend-admin .description,
+.intellisend-admin .pagination-info,
+.intellisend-admin .selection-info,
+.intellisend-admin .intellisend-empty-state {
+    color: var(--is-text-muted);
+}
+
+/* Settings. */
+.intellisend-settings-wrap .intellisend-settings-section {
+    background: transparent;
+    border-bottom-color: var(--is-border);
+}
+
+.intellisend-settings-wrap .intellisend-settings-section-title span {
+    color: var(--is-text-muted) !important;
+}
+
+.intellisend-settings-wrap .intellisend-settings-section:hover,
+.intellisend-settings-wrap .section-collapsed,
+.intellisend-settings-wrap .test-result {
+    background: var(--is-surface-muted);
+}
+
+.intellisend-settings-wrap .intellisend-settings-submit {
+    background: var(--is-surface-muted);
+    border-top-color: var(--is-border);
+}
+
+.intellisend-settings-wrap .test-result.spam,
+.intellisend-settings-wrap .test-result.error,
+.intellisend-settings-wrap .intellisend-notice.error {
+    background: var(--is-danger-bg);
+    color: var(--is-danger-text);
+}
+
+.intellisend-settings-wrap .test-result.not-spam,
+.intellisend-settings-wrap .intellisend-notice.success {
+    background: var(--is-success-bg);
+    color: var(--is-success-text);
+}
+
+/* Providers. */
+.intellisend-providers-wrap .intellisend-providers-header {
+    background: linear-gradient(to right, var(--is-surface-muted), var(--is-surface));
+    border-bottom-color: var(--is-border);
+}
+
+.intellisend-providers-wrap .provider-info {
+    background: rgba(34, 113, 177, 0.08);
+    color: var(--is-text-secondary);
+}
+
+.intellisend-providers-wrap .smtp-field,
+.intellisend-providers-wrap .api-field {
+    background: var(--is-surface-muted);
+}
+
+.intellisend-providers-wrap .provider-test-send {
+    border-bottom-color: var(--is-border);
+}
+
+.intellisend-providers-wrap .intellisend-providers-footer {
+    background: var(--is-surface-muted);
+    border-top-color: var(--is-border);
+}
+
+.intellisend-providers-wrap .credentials-section::before,
+.intellisend-providers-wrap .password-toggle,
+.intellisend-providers-wrap .provider-test-send .field-description {
+    color: var(--is-text-muted);
+}
+
+/* Routing and report tables. */
+.intellisend-admin .intellisend-card > h2,
+.intellisend-admin .intellisend-table th,
+.intellisend-admin .report-section th,
+.intellisend-admin .intellisend-pagination {
+    background: var(--is-surface-muted);
+    border-color: var(--is-border);
+    color: var(--is-text);
+}
+
+.intellisend-admin .intellisend-card > p {
+    color: var(--is-text-muted);
+}
+
+.intellisend-admin .intellisend-table,
+.intellisend-admin .report-section table,
+.intellisend-admin .report-section td {
+    background: var(--is-surface);
+    border-color: var(--is-border);
+    color: var(--is-text-secondary);
+}
+
+.intellisend-admin .intellisend-table tbody tr:hover,
+.intellisend-admin .intellisend-table tbody tr.selected,
+.intellisend-admin .pagination-links a:hover {
+    background: var(--is-surface-hover);
+}
+
+.intellisend-admin .intellisend-table .sort-column,
+.intellisend-admin .action-button,
+.intellisend-admin .pagination-links a,
+.intellisend-admin .pagination-links span {
+    color: var(--is-link);
+}
+
+.intellisend-admin .pagination-links a,
+.intellisend-admin .pagination-links span {
+    background: var(--is-surface-raised);
+    border-color: var(--is-border-strong);
+}
+
+.intellisend-admin .intellisend-filters,
+.intellisend-admin .table-actions,
+.intellisend-admin .report-message,
+.intellisend-admin .report-headers,
+.intellisend-admin .report-error {
+    background: var(--is-surface-muted);
+    border-color: var(--is-border);
+    color: var(--is-text-secondary);
+}
+
+.intellisend-admin .intellisend-modal-header {
+    background: var(--is-surface-muted);
+    border-color: var(--is-border);
+}
+
+/* The report modal is rendered after the page wrapper, so it inherits theme
+ * variables from the WordPress body class rather than .intellisend-admin. */
+.intellisend-modal-content {
+    background: var(--is-surface);
+    color: var(--is-text);
+    border-color: var(--is-border);
+    box-shadow: 0 16px 40px var(--is-shadow);
+}
+
+.intellisend-modal-header,
+.intellisend-modal-content .report-section th {
+    background: var(--is-surface-muted);
+    border-color: var(--is-border);
+    color: var(--is-text);
+}
+
+.intellisend-modal-content .report-section table,
+.intellisend-modal-content .report-section td,
+.intellisend-modal-content .report-message,
+.intellisend-modal-content .report-headers,
+.intellisend-modal-content .report-error {
+    background: var(--is-surface);
+    border-color: var(--is-border);
+    color: var(--is-text-secondary);
+}
+
+.intellisend-modal-content .report-message,
+.intellisend-modal-content .report-headers,
+.intellisend-modal-content .report-error {
+    background: var(--is-surface-muted);
+}
+
+.intellisend-modal-close {
+    color: var(--is-text-muted);
+}
+
+.intellisend-modal-close:hover {
+    background: var(--is-surface-hover);
+    color: var(--is-danger-text);
+}
+
+.intellisend-admin .intellisend-modal-close {
+    color: var(--is-text-muted);
+}
+
+.intellisend-admin .intellisend-modal-close:hover {
+    background: var(--is-surface-hover);
+    color: var(--is-danger-text);
+}
+
+.intellisend-admin .pagination-links .current {
+    background: var(--is-link);
+    border-color: var(--is-link);
+    color: #ffffff;
+}
+
+.intellisend-admin .status-sent,
+.intellisend-admin .status-active {
+    background: var(--is-success-bg);
+    color: var(--is-success-text);
+}
+
+.intellisend-admin .status-spam,
+.intellisend-admin .status-blocked,
+.intellisend-admin .status-error,
+.intellisend-admin .status-failed {
+    background: var(--is-danger-bg);
+    color: var(--is-danger-text);
+}
+
+.intellisend-admin .status-inactive,
+.intellisend-admin .status-antispam-off {
+    background: var(--is-surface-hover);
+    color: var(--is-text-muted);
+}
+
+.intellisend-admin .status-antispam-on {
+    background: var(--is-warning-bg);
+    color: var(--is-warning-text);
+}
+
+.intellisend-admin .intellisend-notice.warning {
+    background: var(--is-warning-bg);
+    color: var(--is-warning-text);
+}
+
+/* Toasts are injected outside the page wrapper. */
+.intellisend-toast,
+.intellisend-notification,
+.intellisend-notice {
+    --is-toast-surface: #ffffff;
+    --is-toast-text: #1e1e1e;
+    --is-toast-muted: #646970;
+    background: var(--is-toast-surface);
+    color: var(--is-toast-text);
+    border-color: #dcdcde;
+}
+
+.intellisend-toast .toast-title,
+.intellisend-toast .toast-message,
+.intellisend-notification .intellisend-notice-content {
+    color: var(--is-toast-text);
+}
+
+.intellisend-toast .toast-close,
+.intellisend-toast-close {
+    color: var(--is-toast-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+    body.toplevel_page_intellisend,
+    body.intellisend_page_intellisend-providers,
+    body.intellisend_page_intellisend-routing,
+    body.intellisend_page_intellisend-reports,
+    body.toplevel_page_intellisend #wpwrap,
+    body.intellisend_page_intellisend-providers #wpwrap,
+    body.intellisend_page_intellisend-routing #wpwrap,
+    body.intellisend_page_intellisend-reports #wpwrap,
+    body.toplevel_page_intellisend #wpcontent,
+    body.intellisend_page_intellisend-providers #wpcontent,
+    body.intellisend_page_intellisend-routing #wpcontent,
+    body.intellisend_page_intellisend-reports #wpcontent,
+    body.toplevel_page_intellisend #wpbody,
+    body.intellisend_page_intellisend-providers #wpbody,
+    body.intellisend_page_intellisend-routing #wpbody,
+    body.intellisend_page_intellisend-reports #wpbody {
+        background: #111827;
+    }
+
+    body.toplevel_page_intellisend #wpfooter,
+    body.intellisend_page_intellisend-providers #wpfooter,
+    body.intellisend_page_intellisend-routing #wpfooter,
+    body.intellisend_page_intellisend-reports #wpfooter {
+        color: #aeb9c8;
+    }
+
+    body.toplevel_page_intellisend #wpfooter a,
+    body.intellisend_page_intellisend-providers #wpfooter a,
+    body.intellisend_page_intellisend-routing #wpfooter a,
+    body.intellisend_page_intellisend-reports #wpfooter a {
+        color: #72aee6;
+    }
+
+    .toplevel_page_intellisend,
+    .intellisend_page_intellisend-providers,
+    .intellisend_page_intellisend-routing,
+    .intellisend_page_intellisend-reports,
+    .intellisend-settings-wrap,
+    .intellisend-providers-wrap,
+    .intellisend-admin {
+        --is-page: #111827;
+        --is-surface: #1f2937;
+        --is-surface-raised: #243244;
+        --is-surface-muted: #273548;
+        --is-surface-hover: #334155;
+        --is-border: #3f4c60;
+        --is-border-strong: #526176;
+        --is-text: #f8fafc;
+        --is-text-secondary: #d7dee8;
+        --is-text-muted: #aeb9c8;
+        --is-link: #72aee6;
+        --is-link-hover: #9ecbf0;
+        --is-focus: #72aee6;
+        --is-shadow: rgba(0, 0, 0, 0.35);
+        --is-input: #111827;
+        --is-disabled: #263244;
+        --is-success-bg: #173d2a;
+        --is-success-text: #9ee6b3;
+        --is-warning-bg: #493713;
+        --is-warning-text: #f8d57e;
+        --is-danger-bg: #4b2028;
+        --is-danger-text: #ffb4bd;
+        color-scheme: dark;
+    }
+
+    .intellisend-settings-wrap select,
+    .intellisend-providers-wrap select,
+    .intellisend-admin select {
+        background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg width='20' height='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 8l5 5 5-5' stroke='%23d7dee8' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+
+    .intellisend-admin .intellisend-modal {
+        background: rgba(2, 6, 23, 0.76);
+    }
+
+    .intellisend-providers-wrap .provider-info {
+        background: rgba(114, 174, 230, 0.12);
+    }
+
+    .intellisend-admin .intellisend-loading-overlay,
+    #page-loading-overlay {
+        background: rgba(17, 24, 39, 0.9);
+    }
+
+    .intellisend-admin .intellisend-table tbody tr,
+    .intellisend-admin .intellisend-table tbody td {
+        border-color: var(--is-border);
+    }
+
+    .intellisend-toast,
+    .intellisend-notification,
+    .intellisend-notice {
+        --is-toast-surface: #1f2937;
+        --is-toast-text: #f8fafc;
+        --is-toast-muted: #aeb9c8;
+        background: var(--is-toast-surface);
+        color: var(--is-toast-text);
+        border-color: #3f4c60;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+    }
+}
+
+@media (prefers-contrast: more) {
+    .intellisend-settings-wrap,
+    .intellisend-providers-wrap,
+    .intellisend-admin {
+        --is-border: currentColor;
+        --is-border-strong: currentColor;
+    }
+}

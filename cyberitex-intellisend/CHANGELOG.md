@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.2] - 2026-09-17
+
+### Added
+- A shared light/dark colour system across Settings, Providers, Routing and Reports, following the operating-system preference independently of the selected WordPress admin colour scheme.
+- Dark native form controls, tables, dialogs, notices, status badges, loading states, toasts and isolated email previews.
+
+### Improved
+- Preserve the established light palette while keeping responsive desktop and mobile layouts consistent in both colour modes.
+- Extend browser regression coverage to verify light surfaces, dark surfaces, form controls and report-preview colour preferences.
+
 ## [1.2.1] - 2026-09-14
 
 ### Fixed

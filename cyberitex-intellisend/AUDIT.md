@@ -1,6 +1,6 @@
 # IntelliSend audit and implementation report
 
-Date: 14 September 2026. Result: compatible fixes implemented as version 1.2.1; decisions and validation limits remain below.
+Date: 14 September 2026, updated 17 September 2026. Result: compatible fixes and responsive light/dark modes implemented through version 1.2.2; decisions and validation limits remain below.
 
 ## Scope and starting state
 
@@ -48,8 +48,8 @@ All reported tests use synthetic data. No live credentials, mail delivery, provi
 | Database regressions | 15 pass using actual in-memory SQLite queries. The starting implementation failed 11, including unknown-column errors and mismatched counts. |
 | Admin boundaries | 110 pass: permissions/nonces, malformed IDs, provider identity/configuration, exact secrets, SMTP cleanup on success/exception, routing validation and secret-safe debug output. |
 | Delivery | 62 assertions pass: pattern matching/parser compatibility, repeated SMTP state, core mail filters/charset, all three captured vendor payloads and failure responses, SES subject/Bcc handling, spam result and endpoint validation. |
-| Browser fixtures | 24 pass using real scripts, local WordPress jQuery and Playwright Chromium, with external requests blocked. Covers serialization, text rendering, key state, labels, keyboard/focus, sandbox preview and no runtime errors. |
-| Actual WordPress integration | Activation succeeded on disposable WordPress 6.7.2 with the WordPress SQLite integration plugin and PHP 8.4.8. 39 browser/AJAX checks pass: four screens at 1440px and 390px, no document overflow, search/status filters, real-nonce report dialog, keyboard closure/focus return, invalid/fixed/missing nonce rejection, authorised selected fixture deletion, subscriber denial and no browser runtime errors. Two targeted checks verify negative and stale page links render the correct first/last page. Screenshots were inspected. |
+| Browser fixtures | 29 pass using real scripts, local WordPress jQuery and Playwright Chromium, with external requests blocked. Covers serialization, text rendering, key state, labels, keyboard/focus, sandbox preview, light/dark surfaces and controls, out-of-wrapper dialogs and no runtime errors. |
+| Actual WordPress integration | Activation succeeded on disposable WordPress 6.7.2 with the WordPress SQLite integration plugin and PHP 8.4.8. The original 39 browser/AJAX checks pass: four screens at 1440px and 390px, no document overflow, search/status filters, real-nonce report dialog, keyboard closure/focus return, invalid/fixed/missing nonce rejection, authorised selected fixture deletion, subscriber denial and no browser runtime errors. Two targeted checks verify negative and stale page links render the correct first/last page. Version 1.2.2 adds 58 live theme checks across both colour modes and widths, including page and control colours, theme asset loading, full page canvas, modal shell and isolated preview. Screenshots were inspected. |
 | Final review | Whitespace/diff review against Git and the saved starting tree; independent delivery review identified two parser edge cases which were fixed and tested. |
 
 The local WordPress lab blocked outbound HTTP and mail. WordPress update checks consequently produced expected connectivity warnings. A temporary fixture-seeding script also needed a `$wpdb` scope correction; this was lab code, not a plugin runtime defect. No MySQL/MariaDB installation, full supported WordPress/PHP matrix, network multisite, production SMTP/API send, two-site migration or third-party form-plugin end-to-end validation was performed. There was no existing build/static-analysis task to run.

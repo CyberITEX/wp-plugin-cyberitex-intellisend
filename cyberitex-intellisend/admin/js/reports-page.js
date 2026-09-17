@@ -481,7 +481,7 @@
                     }
                 });
             });
-            preview.srcdoc = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:"><style>body{font:14px/1.5 sans-serif;overflow-wrap:anywhere;white-space:pre-wrap}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>' + parsed.body.innerHTML + '</body></html>';
+            preview.srcdoc = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:"><style>html{color-scheme:light dark}body{margin:8px;background:#fff;color:#1e1e1e;font:14px/1.5 sans-serif;overflow-wrap:anywhere;white-space:pre-wrap}img{max-width:100%;height:auto}table{max-width:100%}@media(prefers-color-scheme:dark){body{background:#111827;color:#f8fafc}}</style></head><body>' + parsed.body.innerHTML + '</body></html>';
             $container.append(preview).append($('<p class="description"></p>').text('Remote images and links are disabled in this preview.'));
         },
 
